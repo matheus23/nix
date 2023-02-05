@@ -8,6 +8,8 @@ let
         matklad.rust-analyzer
         brettm12345.nixfmt-vscode
         ms-vsliveshare.vsliveshare
+        eamodio.gitlens
+        elmtooling.elm-ls-vscode
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
@@ -137,6 +139,8 @@ in {
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
     pkgs.yq
+    pkgs.pre-commit
+    pkgs.ffmpeg
   ];
 
   # Scripts
