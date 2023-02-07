@@ -54,7 +54,12 @@ let
           version = "1.4.0";
           sha256 = "0p3a8brwpbg3fkhpq257jp7dnydk5b89ramb5yqpdp4yaksvfry5";
         }
-
+        { # required for ElmLS to work
+          name = "vscode-test-explorer";
+          publisher = "hbenl";
+          version = "2.21.1";
+          sha256 = "022lnkq278ic0h9ggpqcwb3x3ivpcqjimhgirixznq0zvwyrwz3w";
+        }
       ];
   };
 
@@ -82,8 +87,13 @@ in {
 
   nixpkgs.config.allowUnfree = true;
 
-  # Doesn't work for some reason right now :(
   home.sessionPath = sessionPath;
+
+  # That fixes home.sessionPath for me under gnome
+  home.file.".profile" = {
+    executable = true;
+    text = "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
+  };
 
   programs.home-manager.enable = true;
 
@@ -141,6 +151,9 @@ in {
     pkgs.yq
     pkgs.pre-commit
     pkgs.ffmpeg
+    pkgs.elmPackages.elm-format
+    pkgs.elmPackages.elm
+    pkgs.signal-desktop
   ];
 
   # Scripts
