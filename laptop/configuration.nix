@@ -122,7 +122,7 @@
   # Home manager
   home-manager.useGlobalPkgs = true;
   home-manager.users.philipp =
-    import /home/philipp/program/nix/home-manager/home.nix;
+    import /home/philipp/program/nix/home/home-manager/home.nix;
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;

@@ -10,6 +10,7 @@ let
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
         elmtooling.elm-ls-vscode
+        vadimcn.vscode-lldb # LLVM debugger for debugging rust
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
@@ -60,6 +61,12 @@ let
           version = "2.21.1";
           sha256 = "022lnkq278ic0h9ggpqcwb3x3ivpcqjimhgirixznq0zvwyrwz3w";
         }
+        { # Dependency of vscode-test-explorer above
+          name = "test-adapter-converter";
+          publisher = "ms-vscode";
+          version = "0.1.6";
+          sha256 = "0pj4ln8g8dzri766h9grdvhknz2mdzwv0lmzkpy7l9w9xx8jsbsh";
+        }
       ];
   };
 
@@ -89,13 +96,18 @@ in {
 
   home.sessionPath = sessionPath;
 
-  # That fixes home.sessionPath for me under gnome
+  # I hoped that this fixes home.sessionPath for me under gnome
+  # It doesn't.
   home.file.".profile" = {
     executable = true;
     text = "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
   };
 
   programs.home-manager.enable = true;
+
+  # VSCode settings "sync"
+  home.file.".config/Code/User/settings.json".text =
+    builtins.readFile ./vscode/settings.json;
 
   # Git stuff
 
@@ -154,6 +166,7 @@ in {
     pkgs.elmPackages.elm-format
     pkgs.elmPackages.elm
     pkgs.signal-desktop
+    pkgs.steam-run
   ];
 
   # Scripts

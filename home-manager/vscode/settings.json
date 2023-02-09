@@ -1,0 +1,104 @@
+{
+    "update.mode": "none",
+    "workbench.colorTheme": "Atom One Light",
+    "explorer.openEditors.visible": 0,
+    "workbench.activityBar.visible": false,
+    "workbench.editor.showTabs": false,
+    "window.menuBarVisibility": "toggle",
+    "editor.minimap.enabled": false,
+    "editor.suggestOnTriggerCharacters": false,
+    "editor.quickSuggestions": {
+        "comments": "off",
+        "strings": "off",
+        "other": "off"
+    },
+    "editor.renderLineHighlight": "none",
+    // Live share changes:
+    "liveshare.guestApprovalRequired": true,
+    //"liveshare.connectionMode": "direct",
+    "workbench.startupEditor": "newUntitledFile",
+    "breadcrumbs.enabled": true,
+    "explorer.confirmDragAndDrop": false,
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    "[latex]": {
+        "editor.wordWrap": "on"
+    },
+    "[plaintext]": {},
+    "[markdown]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": {
+            "comments": "off",
+            "strings": "off",
+            "other": "off"
+        },
+        "editor.tabSize": 2,
+        "editor.formatOnSave": false
+    },
+    "[mdx]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": {
+            "comments": "off",
+            "strings": "off",
+            "other": "off"
+        },
+        "editor.tabSize": 2,
+        "editor.formatOnSave": false
+    },
+    "liveshare.featureSet": "insiders",
+    "[haskell]": {
+        "editor.defaultFormatter": "haskell.haskell",
+        "editor.formatOnSave": true,
+    },
+    "[purescript]": {
+        "editor.tabSize": 2,
+        "editor.formatOnSave": true
+    },
+    "[elm]": {
+        "editor.rulers": [
+            90,
+            {
+                "column": 61
+            }
+        ],
+        "editor.formatOnSave": true
+    },
+    "[nix]": {
+        "editor.formatOnSave": true
+    },
+    "purescript.autocompleteAddImport": true,
+    // "editor.fontFamily": "'Fira Code', 'Noto Color Emoji', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'",
+    "editor.fontFamily": "'Fira Code', 'Droid Sans Mono', 'monospace', monospace",
+    "editor.fontLigatures": true,
+    "editor.lineNumbers": "off",
+    "extensions.autoUpdate": false,
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "git.enableSmartCommit": true,
+    "haskell.formattingProvider": "stylish-haskell",
+    "haskell.trace.server": "messages",
+    "workbench.colorTheme": "Quiet Light",
+    "workbench.panel.defaultLocation": "right",
+    "workbench.sideBar.location": "right",
+    "typescript.updateImportsOnFileMove.enabled": "never",
+    "haskell.plugin.hlint.diagnosticsOn": false,
+    "haskell.plugin.hlint.codeActionsOn": false,
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[rust]": {
+        "editor.formatOnSave": true,
+        "editor.inlayHints.enabled": "offUnlessPressed",
+    },
+    "haskell.manageHLS": "GHCup",
+    "elmLS.onlyUpdateDiagnosticsOnSave": true,
+    "elmLS.disableElmLSDiagnostics": true,
+    "window.zoomLevel": 1
+}
