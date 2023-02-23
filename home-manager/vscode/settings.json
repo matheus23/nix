@@ -67,8 +67,7 @@
         "editor.formatOnSave": true
     },
     "purescript.autocompleteAddImport": true,
-    // "editor.fontFamily": "'Fira Code', 'Noto Color Emoji', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'",
-    "editor.fontFamily": "'Fira Code', 'Droid Sans Mono', 'monospace', monospace",
+    "editor.fontFamily": "'Fira Code', 'Noto Color Emoji', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'",
     "editor.fontLigatures": true,
     "editor.lineNumbers": "off",
     "extensions.autoUpdate": false,
