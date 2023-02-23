@@ -146,6 +146,16 @@
     pkgs.pavucontrol
   ];
 
+  # Fonts!
+  fonts.fonts = with pkgs; [
+    noto-fonts
+    noto-fonts-cjk
+    noto-fonts-emoji
+    liberation_ttf
+    fira-code
+    fira-code-symbols
+  ];
+
   # Possible ZSH workaround https://github.com/nix-community/home-manager/issues/2751#issuecomment-1048682643
   programs.zsh.enable = true;
 
