@@ -1,6 +1,5 @@
 {
     "update.mode": "none",
-    "workbench.colorTheme": "Atom One Light",
     "explorer.openEditors.visible": 0,
     "workbench.activityBar.visible": false,
     "workbench.editor.showTabs": false,
@@ -48,7 +47,7 @@
     "liveshare.featureSet": "insiders",
     "[haskell]": {
         "editor.defaultFormatter": "haskell.haskell",
-        "editor.formatOnSave": true,
+        "editor.formatOnSave": true
     },
     "[purescript]": {
         "editor.tabSize": 2,
@@ -94,7 +93,7 @@
     },
     "[rust]": {
         "editor.formatOnSave": true,
-        "editor.inlayHints.enabled": "offUnlessPressed",
+        "editor.inlayHints.enabled": "offUnlessPressed"
     },
     "haskell.manageHLS": "GHCup",
     "elmLS.onlyUpdateDiagnosticsOnSave": true,
