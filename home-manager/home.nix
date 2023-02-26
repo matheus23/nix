@@ -11,6 +11,7 @@ let
         eamodio.gitlens
         elmtooling.elm-ls-vscode
         vadimcn.vscode-lldb # LLVM debugger for debugging rust
+        denoland.vscode-deno
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
@@ -67,6 +68,12 @@ let
           version = "0.1.6";
           sha256 = "0pj4ln8g8dzri766h9grdvhknz2mdzwv0lmzkpy7l9w9xx8jsbsh";
         }
+        { # Tailwind intellisense ... for deno (fresh)?
+          name = "twind-intellisense";
+          publisher = "sastan";
+          version = "0.2.1";
+          sha256 = "1lp7i2fw9ycr6x7rfw7zcr81pch250xw0pdg19xn3ic8wpdwdspp";
+        }
       ];
   };
 
@@ -83,7 +90,8 @@ let
   signingPubKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII4oFL+qMOmADJ+KGZwQ13Ma65zcEcXuF4JYjNrjvIr5 nixos git commit signing for philipp.krueger1@gmail.com";
 
-  sessionPath = [ "$HOME/.local/bin" "$HOME/.cargo/bin" "$PATH" ];
+  sessionPath =
+    [ "$HOME/.local/bin" "$HOME/.cargo/bin" "/home/philipp/.deno/bin" "$PATH" ];
 
   _1password = pkgs._1password-gui;
 
@@ -167,6 +175,7 @@ in {
     pkgs.elmPackages.elm
     pkgs.signal-desktop
     pkgs.steam-run
+    pkgs.deno
   ];
 
   # Scripts
