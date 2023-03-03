@@ -176,6 +176,8 @@ in {
     pkgs.signal-desktop
     pkgs.steam-run
     pkgs.deno
+    pkgs.slack
+    pkgs.brave
   ];
 
   # Scripts
