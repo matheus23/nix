@@ -180,6 +180,7 @@ in {
     pkgs.brave
     pkgs.cargo-nextest
     pkgs.cargo-audit
+    pkgs.cargo-deny
   ];
 
   # Scripts
