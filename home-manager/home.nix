@@ -178,6 +178,8 @@ in {
     pkgs.deno
     pkgs.slack
     pkgs.brave
+    pkgs.cargo-nextest
+    pkgs.cargo-audit
   ];
 
   # Scripts
