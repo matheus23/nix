@@ -7,6 +7,7 @@ let
   vscode = pkgs.vscode-with-extensions.override {
     vscodeExtensions = with pkgs.vscode-extensions;
       [
+        matklad.rust-analyzer
         brettm12345.nixfmt-vscode
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
@@ -14,7 +15,7 @@ let
         vadimcn.vscode-lldb # LLVM debugger for debugging rust
         denoland.vscode-deno
       ] ++ [
-        unstable.pkgs.vscode-extensions.matklad.rust-analyzer # Trying to use the most recent version
+        # unstable.pkgs.vscode-extensions.matklad.rust-analyzer # Trying to use the most recent version
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
@@ -184,6 +185,7 @@ in {
     pkgs.cargo-nextest
     pkgs.cargo-audit
     pkgs.cargo-deny
+    pkgs.cargo-modules
   ];
 
   # Scripts
