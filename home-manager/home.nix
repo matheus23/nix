@@ -186,7 +186,7 @@ in {
     pkgs.cargo-audit
     pkgs.cargo-deny
     pkgs.cargo-modules
-    pkgs.wesnoth
+    (import ../custom/wesnoth.nix { pkgs = pkgs; })
   ];
 
   # Scripts
