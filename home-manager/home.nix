@@ -186,6 +186,7 @@ in {
     pkgs.cargo-audit
     pkgs.cargo-deny
     pkgs.cargo-modules
+    pkgs.wesnoth
   ];
 
   # Scripts
