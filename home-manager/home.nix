@@ -187,6 +187,11 @@ in {
     pkgs.cargo-deny
     pkgs.cargo-modules
     (import ../custom/wesnoth.nix { pkgs = pkgs; })
+    pkgs.figma-linux
+    pkgs.kubo
+    # Fonts
+    # (import ../custom/ideal-fonts.nix { pkgs = pkgs; }) # Couldn't get this to be picked up by figma-linux.
+    pkgs.overpass
   ];
 
   # Scripts
