@@ -192,6 +192,11 @@ in {
     # Fonts
     # (import ../custom/ideal-fonts.nix { pkgs = pkgs; }) # Couldn't get this to be picked up by figma-linux.
     pkgs.overpass
+    pkgs.gimp
+    # pkgs.fuse3
+    pkgs.protobuf
+    pkgs.tailscale
+    # pkgs.linuxPackages_latest.perf # seems broken atm
   ];
 
   # Scripts

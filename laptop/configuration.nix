@@ -161,6 +161,7 @@
 
   # Enable nix ld (https://github.com/Mic92/nix-ld)
   # I need this to support running downloaded binaries.
+  # Currently that is at least the fission cli & kubo
   programs.nix-ld.enable = true;
 
   # Sets up all the libraries to load
@@ -191,12 +192,18 @@
         openssl
         curl
         expat
+        openssl_1_1.out
+        gmp.out
+        ncurses.out
+        zlib.out
       ];
 
     NIX_LD = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
   };
 
   environment.localBinInPath = true;
+
+  nix.settings.experimental-features = "nix-command flakes";
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
