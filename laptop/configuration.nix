@@ -9,9 +9,6 @@
     <nixos-hardware/lenovo/thinkpad/t14/amd/gen3>
 
     <home-manager/nixos>
-
-    # TODO: Remove once NixOS 23.05 is released.
-    <nix-ld/modules/nix-ld.nix>
   ];
 
   # Bootloader.
@@ -165,41 +162,24 @@
   programs.nix-ld.enable = true;
 
   # Sets up all the libraries to load
-  # TODO: Enable with NixOS 23.05
-  # programs.nix-ld.libraries = with pkgs; [
-  #   stdenv.cc.cc
-  #   zlib
-  #   fuse3
-  #   icuy
-  #   zlib
-  #   nss
-  #   openssl
-  #   curl
-  #   expat
-  #   # ...
-  # ];
+  programs.nix-ld.libraries = with pkgs; [
+    stdenv.cc.cc
+    zlib
+    fuse3
+    icu
+    zlib
+    nss
+    openssl
+    curl
+    expat
+    openssl_1_1.out
+    gmp.out
+    ncurses.out
+    zlib.out
+  ];
 
-  # TODO: Remove with NixOS 23.05
-  environment.variables = {
-    NIX_LD_LIBRARY_PATH = with pkgs;
-      lib.makeLibraryPath [
-        stdenv.cc.cc
-        zlib
-        fuse3
-        icu
-        zlib
-        nss
-        openssl
-        curl
-        expat
-        openssl_1_1.out
-        gmp.out
-        ncurses.out
-        zlib.out
-      ];
-
-    NIX_LD = builtins.readFile "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
-  };
+  # For the above nix-ld stuff (openssl_1_1.out)
+  nixpkgs.config.permittedInsecurePackages = [ "openssl-1.1.1u" ];
 
   environment.localBinInPath = true;
 
