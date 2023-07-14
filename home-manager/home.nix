@@ -7,7 +7,7 @@ let
   vscode = pkgs.vscode-with-extensions.override {
     vscodeExtensions = with pkgs.vscode-extensions;
       [
-        # matklad.rust-analyzer This is outdated. Latest seems to have moved to the rust-lang org
+        rust-lang.rust-analyzer # at the time of writing an old version (0.3.1426)
         brettm12345.nixfmt-vscode
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
@@ -18,12 +18,13 @@ let
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
 
         # Problems with hashes: I probably should start switching at some point https://github.com/NixOS/nixpkgs/issues/197682
-        { # Because Nixpkgs doesn't have that yet in vscode-extensions
-          name = "rust-analyzer";
-          publisher = "rust-lang";
-          version = "0.4.1577";
-          sha256 = "1wz4p2dhbhxf0f2d8zanqwln3nffwn6805p2lbgzchw0d7hhzmzg";
-        }
+        # Doesn't currently work due to "unsupported platform" errors at runtime?
+        # { # Because Nixpkgs doesn't have that yet in vscode-extensions
+        #   name = "rust-analyzer";
+        #   publisher = "rust-lang";
+        #   version = "0.4.1577";
+        #   sha256 = "1wz4p2dhbhxf0f2d8zanqwln3nffwn6805p2lbgzchw0d7hhzmzg";
+        # }
         {
           name = "theme-atom-one-light";
           publisher = "b4456609";
@@ -45,8 +46,8 @@ let
         {
           name = "tldraw-vscode";
           publisher = "tldraw-org";
-          version = "1.25.2";
-          sha256 = "1vsvlbbmrlify1awqhdsfhb50kf2g0sxwja5096jyn9rqjks2l84";
+          version = "2.0.11";
+          sha256 = "0649kigssry5vvjmdf06g3fr2bsnjp0a7sb3dvazi9qwp00c80c9";
         }
         {
           name = "even-better-toml";
