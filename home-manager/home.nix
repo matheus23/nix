@@ -193,6 +193,8 @@ in {
     pkgs.cargo-audit
     pkgs.cargo-deny
     pkgs.cargo-modules
+    pkgs.cargo-workspaces
+    pkgs.cargo-insta
     (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
@@ -203,7 +205,10 @@ in {
     # pkgs.fuse3
     pkgs.protobuf
     pkgs.tailscale
-    # pkgs.linuxPackages_latest.perf # seems broken atm
+    pkgs.linuxKernel.packages.linux_6_1.perf # need to update this with the current compiler version
+    pkgs.hotspot
+    pkgs.binaryen
+    pkgs.wasm-bindgen-cli
   ];
 
   # Scripts
