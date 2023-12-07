@@ -7,7 +7,7 @@ let
   vscode = pkgs.vscode-with-extensions.override {
     vscodeExtensions = with pkgs.vscode-extensions;
       [
-        rust-lang.rust-analyzer # at the time of writing an old version (0.3.1426)
+        rust-lang.rust-analyzer
         brettm12345.nixfmt-vscode
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
@@ -16,15 +16,6 @@ let
         denoland.vscode-deno
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
-
-        # Problems with hashes: I probably should start switching at some point https://github.com/NixOS/nixpkgs/issues/197682
-        # Doesn't currently work due to "unsupported platform" errors at runtime?
-        # { # Because Nixpkgs doesn't have that yet in vscode-extensions
-        #   name = "rust-analyzer";
-        #   publisher = "rust-lang";
-        #   version = "0.4.1577";
-        #   sha256 = "1wz4p2dhbhxf0f2d8zanqwln3nffwn6805p2lbgzchw0d7hhzmzg";
-        # }
         {
           name = "theme-atom-one-light";
           publisher = "b4456609";
@@ -85,6 +76,12 @@ let
           version = "0.2.1";
           sha256 = "1lp7i2fw9ycr6x7rfw7zcr81pch250xw0pdg19xn3ic8wpdwdspp";
         }
+        { # zig language server & more
+          name = "vscode-zig";
+          publisher = "ziglang";
+          version = "0.5.1";
+          sha256 = "1m25bbgfv8x8f0ywadjwsmh4myqgp8xwf5yjrkskgr8axj8ny36a";
+        }
       ];
   };
 
@@ -112,6 +109,8 @@ in {
   home.stateVersion = "22.11";
 
   nixpkgs.config.allowUnfree = true;
+  # I wish I knew what needed this. :|
+  nixpkgs.config.permittedInsecurePackages = [ "electron-24.8.6" ];
 
   home.sessionPath = sessionPath;
 
@@ -180,11 +179,12 @@ in {
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
     pkgs.yq
+    pkgs.jq
     pkgs.pre-commit
     pkgs.ffmpeg
     pkgs.elmPackages.elm-format
     pkgs.elmPackages.elm
-    pkgs.signal-desktop
+    unstable.signal-desktop # we need unstable for the latest version, so it actually works.
     pkgs.steam-run
     pkgs.deno
     pkgs.slack
@@ -195,7 +195,8 @@ in {
     pkgs.cargo-modules
     pkgs.cargo-workspaces
     pkgs.cargo-insta
-    (import ../custom/wesnoth.nix { pkgs = pkgs; })
+    pkgs.cargo-udeps
+    # (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
     # Fonts
@@ -209,7 +210,13 @@ in {
     pkgs.hotspot
     pkgs.binaryen
     pkgs.wasm-bindgen-cli
+    pkgs.zig
   ];
+
+  dconf.settings = {
+    # Let gnome handle my time zone
+    "org/gnome/desktop/datetime" = { automatic-timezone = true; };
+  };
 
   # Scripts
   home.file.".local/bin/fisload" = {

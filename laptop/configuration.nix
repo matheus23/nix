@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }: {
+{ config, pkgs, lib, ... }: {
   imports = [ # Include the results of the hardware scan.
     ./hardware-configuration.nix
     # Manually added some quirks to fix WiFi
@@ -13,6 +13,7 @@
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.conigurationLimit = 10;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
@@ -49,7 +50,8 @@
   networking.networkmanager.enable = true;
 
   # Set your time zone.
-  time.timeZone = "Europe/Berlin";
+  # time.timeZone = "Europe/Berlin";
+  time.timeZone = lib.mkForce null; # allow TZ to be set by desktop user
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
@@ -144,7 +146,7 @@
   ];
 
   # Fonts!
-  fonts.fonts = with pkgs; [
+  fonts.packages = with pkgs; [
     noto-fonts
     noto-fonts-cjk
     noto-fonts-emoji
@@ -179,7 +181,8 @@
   ];
 
   # For the above nix-ld stuff (openssl_1_1.out)
-  nixpkgs.config.permittedInsecurePackages = [ "openssl-1.1.1u" ];
+  nixpkgs.config.permittedInsecurePackages =
+    [ "openssl-1.1.1u" "openssl-1.1.1w" "electron-24.8.6" ];
 
   environment.localBinInPath = true;
 
