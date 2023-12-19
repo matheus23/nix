@@ -14,6 +14,7 @@ let
         elmtooling.elm-ls-vscode
         vadimcn.vscode-lldb # LLVM debugger for debugging rust
         denoland.vscode-deno
+        svelte.svelte-vscode
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
