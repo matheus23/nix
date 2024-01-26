@@ -12,7 +12,7 @@ let
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
         elmtooling.elm-ls-vscode
-        vadimcn.vscode-lldb # LLVM debugger for debugging rust
+        # vadimcn.vscode-lldb # LLVM debugger for debugging rust
         denoland.vscode-deno
         svelte.svelte-vscode
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
