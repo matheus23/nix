@@ -122,6 +122,10 @@ in {
     text = "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
   };
 
+  # Let's also try this
+  programs.bash.initExtra =
+    "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
+
   programs.home-manager.enable = true;
 
   # VSCode settings "sync"
@@ -212,6 +216,9 @@ in {
     pkgs.binaryen
     pkgs.wasm-bindgen-cli
     pkgs.zig
+    pkgs.prismlauncher # minecraft (with mods)
+    pkgs.nfs-utils
+    pkgs.nix-index
   ];
 
   dconf.settings = {

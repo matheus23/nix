@@ -192,8 +192,6 @@
   nixpkgs.config.permittedInsecurePackages =
     [ "openssl-1.1.1u" "openssl-1.1.1w" "electron-24.8.6" ];
 
-  environment.localBinInPath = true;
-
   nix.settings.experimental-features = "nix-command flakes";
 
   # Some programs need SUID wrappers, can be configured further or are
