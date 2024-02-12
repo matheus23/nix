@@ -100,6 +100,8 @@
     "haskell.manageHLS": "GHCup",
     "elmLS.onlyUpdateDiagnosticsOnSave": true,
     "elmLS.disableElmLSDiagnostics": true,
-    "window.zoomLevel": 0.5,
-    "rust-analyzer.cargo.sysroot": "discover"
+    "rust-analyzer.cargo.sysroot": "discover",
+    "rust-analyzer.server.path": "/nix/store/v2wwnf8w9pkl1vcr37iv60fh8pz0z198-rustup-1.26.0/bin/rust-analyzer",
+    "rust-analyzer.rust.analyzerTargetDir": true,
+    "window.zoomLevel": 0.5
 }

@@ -7,16 +7,22 @@ let
   vscode = pkgs.vscode-with-extensions.override {
     vscodeExtensions = with pkgs.vscode-extensions;
       [
-        rust-lang.rust-analyzer
+        # rust-lang.rust-analyzer
         brettm12345.nixfmt-vscode
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
         elmtooling.elm-ls-vscode
-        # vadimcn.vscode-lldb # LLVM debugger for debugging rust
+        # vadimcn.vscode-lldb # LLVM debugger for debugging rust, this fails the build for some reason now
         denoland.vscode-deno
         svelte.svelte-vscode
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
+        {
+          name = "rust-analyzer";
+          publisher = "rust-lang";
+          version = "0.4.1835";
+          sha256 = "sha256-h6tn/0WXEW0roproFiYkWV+kTkpfNjA8rLkKMV1/7Ok=";
+        }
         {
           name = "theme-atom-one-light";
           publisher = "b4456609";
@@ -219,6 +225,8 @@ in {
     pkgs.prismlauncher # minecraft (with mods)
     pkgs.nfs-utils
     pkgs.nix-index
+    unstable.rust-analyzer
+    pkgs.calibre
   ];
 
   dconf.settings = {
