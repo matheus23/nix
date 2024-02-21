@@ -114,7 +114,7 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Krüger";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
     packages = with pkgs; [ ];
   };
 
@@ -144,6 +144,8 @@
     pkgs.rsync
     pkgs.pavucontrol
   ];
+
+  virtualisation.docker.enable = true;
 
   programs.steam = {
     enable = true;
