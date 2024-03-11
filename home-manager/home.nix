@@ -12,9 +12,10 @@ let
         ms-vsliveshare.vsliveshare
         eamodio.gitlens
         elmtooling.elm-ls-vscode
-        # vadimcn.vscode-lldb # LLVM debugger for debugging rust, this fails the build for some reason now
+        vadimcn.vscode-lldb
         denoland.vscode-deno
         svelte.svelte-vscode
+        mkhl.direnv
       ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
@@ -153,6 +154,8 @@ in {
       pull.ff = "only";
       core.excludesfile = "/home/philipp/.config/git/gitignore_global";
 
+      rerere.enabled = "true";
+
       # https://calebhearth.com/sign-git-with-ssh
       gpg.format = "ssh";
       gpg.ssh.allowedSignersFile = "/home/philipp/.ssh/allowed_signers";
@@ -227,6 +230,9 @@ in {
     pkgs.nix-index
     unstable.rust-analyzer
     pkgs.calibre
+    pkgs.shotcut
+    pkgs.musescore
+    pkgs.direnv
   ];
 
   dconf.settings = {

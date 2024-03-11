@@ -1,9 +1,9 @@
 {
     "update.mode": "none",
-    // This generates a warning at the moment. 1 is the minimum?
-    // "explorer.openEditors.visible": 0,
-    "workbench.activityBar.visible": false,
-    "workbench.editor.showTabs": "none",
+    "explorer.openEditors.visible": 1,
+    "workbench.activityBar.location": "hidden",
+    "workbench.editor.showTabs": "single",
+    "breadcrumbs.enabled": true,
     "window.menuBarVisibility": "toggle",
     "editor.minimap.enabled": false,
     "editor.suggestOnTriggerCharacters": false,
@@ -17,7 +17,6 @@
     "liveshare.guestApprovalRequired": true,
     //"liveshare.connectionMode": "direct",
     "workbench.startupEditor": "newUntitledFile",
-    "breadcrumbs.enabled": true,
     "explorer.confirmDragAndDrop": false,
     "git.autofetch": true,
     "git.confirmSync": false,
