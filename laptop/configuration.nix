@@ -192,7 +192,7 @@
 
   # For the above nix-ld stuff (openssl_1_1.out)
   nixpkgs.config.permittedInsecurePackages =
-    [ "openssl-1.1.1u" "openssl-1.1.1w" "electron-24.8.6" ];
+    [ "openssl-1.1.1u" "openssl-1.1.1w" "electron-25.9.0" ];
 
   nix.settings.experimental-features = "nix-command flakes";
 
