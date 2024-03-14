@@ -233,6 +233,8 @@ in {
     pkgs.shotcut
     pkgs.musescore
     pkgs.direnv
+    pkgs.maestral
+    pkgs.maestral-gui
   ];
 
   dconf.settings = {
