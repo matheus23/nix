@@ -114,7 +114,7 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Krüger";
-    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    extraGroups = [ "networkmanager" "wheel" "docker" "adbusers" ];
     packages = with pkgs; [ ];
   };
 
@@ -153,6 +153,19 @@
     remotePlay.openFirewall = true;
     # Open ports in the firewall for Source Dedicated Server
     dedicatedServer.openFirewall = true;
+  };
+
+  # Android development
+  programs.adb.enable = true;
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [ 1420 ];
+    allowedUDPPortRanges = [
+      # {
+      #   from = 4000;
+      #   to = 4007;
+      # }
+    ];
   };
 
   # Fonts!

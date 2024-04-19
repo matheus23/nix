@@ -9,7 +9,7 @@ let
       [
         # rust-lang.rust-analyzer
         brettm12345.nixfmt-vscode
-        ms-vsliveshare.vsliveshare
+        # ms-vsliveshare.vsliveshare
         eamodio.gitlens
         elmtooling.elm-ls-vscode
         vadimcn.vscode-lldb
@@ -21,8 +21,8 @@ let
         {
           name = "rust-analyzer";
           publisher = "rust-lang";
-          version = "0.4.1835";
-          sha256 = "sha256-h6tn/0WXEW0roproFiYkWV+kTkpfNjA8rLkKMV1/7Ok=";
+          version = "0.4.1907";
+          sha256 = "07nva6cbxi665kzry9vf0b1vjvfz01959a0dkdmzsl5fdaw67f41";
         }
         {
           name = "theme-atom-one-light";
@@ -229,7 +229,6 @@ in {
     pkgs.nfs-utils
     pkgs.nix-index
     unstable.rust-analyzer
-    pkgs.calibre
     pkgs.shotcut
     pkgs.musescore
     pkgs.direnv
