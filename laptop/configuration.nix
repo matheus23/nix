@@ -159,7 +159,10 @@
   programs.adb.enable = true;
   networking.firewall = {
     enable = true;
-    allowedTCPPorts = [ 1420 ];
+    allowedTCPPorts = [
+      1420 # used by tauri/vite
+      1421 # used for HMR by tauri/vite
+    ];
     allowedUDPPortRanges = [
       # {
       #   from = 4000;
