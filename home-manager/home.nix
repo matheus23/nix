@@ -118,7 +118,8 @@ in {
 
   nixpkgs.config.allowUnfree = true;
   # I wish I knew what needed this. :|
-  nixpkgs.config.permittedInsecurePackages = [ "electron-24.8.6" ];
+  nixpkgs.config.permittedInsecurePackages =
+    [ "electron-24.8.6" "electron-25.9.0" ];
 
   home.sessionPath = sessionPath;
 
