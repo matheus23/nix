@@ -39,8 +39,8 @@ let
         {
           name = "elm-ls-vscode";
           publisher = "elmTooling";
-          version = "2.6.0";
-          sha256 = "1nsykffx8byyaqr23dql96l25gbwr4rzai0jziw7g5s5hbnmrlc8";
+          version = "2.8.0";
+          sha256 = "1yy1xya1jzcah6fg5p729z97ca6777x42b68iv4l4wyqv204fnzk";
         }
         {
           name = "tldraw-vscode";
