@@ -224,7 +224,7 @@ in {
     pkgs.linuxKernel.packages.linux_6_1.perf # need to update this with the current compiler version
     pkgs.hotspot
     pkgs.binaryen
-    pkgs.wasm-bindgen-cli
+    unstable.wasm-bindgen-cli
     pkgs.zig
     pkgs.prismlauncher # minecraft (with mods)
     pkgs.nfs-utils
