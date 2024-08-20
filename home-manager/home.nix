@@ -236,6 +236,7 @@ in {
     pkgs.direnv
     pkgs.maestral
     pkgs.maestral-gui
+    pkgs.lnav # this is really a pretty decent log viewer
   ];
 
   dconf.settings = {
