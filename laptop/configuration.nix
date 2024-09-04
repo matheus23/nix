@@ -131,7 +131,7 @@
   environment.systemPackages = [
     pkgs.wget
     pkgs.curl
-    pkgs.gnome.gedit
+    pkgs.gedit
     pkgs.gnome.gnome-tweaks
     pkgs.vlc
     pkgs.usbutils

@@ -243,44 +243,4 @@ in {
     # Let gnome handle my time zone
     "org/gnome/desktop/datetime" = { automatic-timezone = true; };
   };
-
-  # Scripts
-  home.file.".local/bin/fisload" = {
-    executable = true;
-    text = ''
-      #!/bin/sh
-      LOAD=~/.config/fission-"$1"
-      DST=~/.config/fission
-
-      if test -e "$DST"; then
-        echo "Please fisunload first";
-        exit 1;
-      fi
-
-      if test -e "$LOAD"; then
-        mv "$LOAD" "$DST"
-      else
-        echo "Cannot load $1: Not found.";
-        exit 1;
-      fi
-
-      fission whoami
-    '';
-  };
-
-  home.file.".local/bin/fisunload" = {
-    executable = true;
-    text = ''
-      #!/bin/sh
-      USERNAME="$(yq -r .username ~/.config/fission/config.yaml)"
-      mv ~/.config/fission ~/.config/fission-"$USERNAME"
-
-      if [ -z "$1" ]
-          then
-              exit 0
-          else
-              fisload "$1"
-      fi
-    '';
-  };
 }
