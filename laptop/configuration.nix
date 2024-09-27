@@ -88,7 +88,8 @@
   console.keyMap = "de";
 
   # Enable CUPS to print documents.
-  services.printing.enable = true;
+  # Actually, disable CUPS. I don't need it right now https://news.ycombinator.com/item?id=41662596
+  services.printing.enable = false;
 
   # Enable sound with pipewire.
   sound.enable = true;
