@@ -212,6 +212,7 @@ in {
     pkgs.cargo-insta
     pkgs.cargo-udeps
     pkgs.cargo-bloat
+    pkgs.cargo-make
     # (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
