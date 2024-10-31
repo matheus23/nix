@@ -226,7 +226,7 @@ in {
     pkgs.linuxKernel.packages.linux_6_1.perf # need to update this with the current compiler version
     pkgs.hotspot
     pkgs.binaryen
-    unstable.wasm-bindgen-cli
+    # unstable.wasm-bindgen-cli
     pkgs.zig
     pkgs.prismlauncher # minecraft (with mods)
     pkgs.nfs-utils
@@ -238,6 +238,7 @@ in {
     pkgs.maestral
     pkgs.maestral-gui
     pkgs.lnav # this is really a pretty decent log viewer
+    pkgs.git-filter-repo
   ];
 
   dconf.settings = {
