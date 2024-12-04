@@ -7,6 +7,7 @@ I'm uploading these files here so they're persisted & when I'll need to set up a
 
 ## How to: System Updates
 
+(Writing this down mainly so I can RTFM for myself.)
 You wish it were easy. Maybe I'm just doing it wrong. Oh well, anyhow here we go:
 
 I have a bunch of nix channels:
@@ -51,5 +52,6 @@ $ sudo nixos-rebuild switch --upgrade # not sure if that upgrade is needed or no
 ```
 
 (At some point I also updated the `hardware-configuration.nix` via `nixos-generate-config` and playing around with the symlinks so it actually runs through. That may or may not be necessary the next time, too.)
+(Next time: This was not necessary. Instead there were a couple of deprecations in configuration.nix I was working through, but the error messages proved helpful.)
 
 Now pray that it works & reboot 8-)
