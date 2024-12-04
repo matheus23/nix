@@ -239,6 +239,7 @@ in {
     pkgs.maestral-gui
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
+    unstable.zed-editor
   ];
 
   dconf.settings = {
