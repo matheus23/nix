@@ -190,7 +190,7 @@ in {
     pkgs.chromium
     pkgs.yarn
     pkgs.nodejs
-    pkgs.nixfmt
+    pkgs.nixfmt-rfc-style
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
     pkgs.yq
@@ -214,6 +214,7 @@ in {
     pkgs.cargo-bloat
     pkgs.cargo-make
     pkgs.cargo-watch
+    pkgs.cargo-release
     # (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
