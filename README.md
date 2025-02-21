@@ -55,3 +55,15 @@ $ sudo nixos-rebuild switch --upgrade # not sure if that upgrade is needed or no
 (Next time: This was not necessary. Instead there were a couple of deprecations in configuration.nix I was working through, but the error messages proved helpful.)
 
 Now pray that it works & reboot 8-)
+
+## How to: Non-major Updates
+
+Sometimes I need new packages (signal-desktop, nodejs, etc.) and want to update them,
+but there might not have been a new major release yet.
+In that case, I update my nix-channels and rebuild:
+
+```sh
+$ sudo nix-channel --update
+$ nix-channel --update
+$ sudo nixos-rebuild switch
+```

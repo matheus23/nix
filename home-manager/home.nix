@@ -5,7 +5,8 @@ let
 
   # Virtual Studio Code config
   vscode = pkgs.vscode-with-extensions.override {
-    vscodeExtensions = with pkgs.vscode-extensions;
+    vscodeExtensions =
+      with pkgs.vscode-extensions;
       [
         # rust-lang.rust-analyzer
         brettm12345.nixfmt-vscode
@@ -16,13 +17,14 @@ let
         denoland.vscode-deno
         svelte.svelte-vscode
         mkhl.direnv
-      ] ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
+      ]
+      ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
         # https://github.com/NixOS/nixpkgs/blob/42d815d1026e57f7e6f178de5a280c14f7aba1a5/pkgs/misc/vscode-extensions/update_installed_exts.sh
         {
           name = "rust-analyzer";
           publisher = "rust-lang";
-          version = "0.4.1907";
-          sha256 = "07nva6cbxi665kzry9vf0b1vjvfz01959a0dkdmzsl5fdaw67f41";
+          version = "0.4.2313";
+          sha256 = "0jsvqn6f0a9dlfjdh8m29g7smvi1ay6if2mlildwgibip4j2r5ha";
         }
         {
           name = "theme-atom-one-light";
@@ -66,25 +68,29 @@ let
           version = "1.4.0";
           sha256 = "0p3a8brwpbg3fkhpq257jp7dnydk5b89ramb5yqpdp4yaksvfry5";
         }
-        { # required for ElmLS to work
+        {
+          # required for ElmLS to work
           name = "vscode-test-explorer";
           publisher = "hbenl";
           version = "2.21.1";
           sha256 = "022lnkq278ic0h9ggpqcwb3x3ivpcqjimhgirixznq0zvwyrwz3w";
         }
-        { # Dependency of vscode-test-explorer above
+        {
+          # Dependency of vscode-test-explorer above
           name = "test-adapter-converter";
           publisher = "ms-vscode";
           version = "0.1.6";
           sha256 = "0pj4ln8g8dzri766h9grdvhknz2mdzwv0lmzkpy7l9w9xx8jsbsh";
         }
-        { # Tailwind intellisense ... for deno (fresh)?
+        {
+          # Tailwind intellisense ... for deno (fresh)?
           name = "twind-intellisense";
           publisher = "sastan";
           version = "0.2.1";
           sha256 = "1lp7i2fw9ycr6x7rfw7zcr81pch250xw0pdg19xn3ic8wpdwdspp";
         }
-        { # zig language server & more
+        {
+          # zig language server & more
           name = "vscode-zig";
           publisher = "ziglang";
           version = "0.5.1";
@@ -93,33 +99,29 @@ let
       ];
   };
 
-  tdesktop = pkgs.symlinkJoin {
-    name = "tdesktop";
-    paths = [ pkgs.tdesktop ];
-    buildInputs = [ pkgs.makeWrapper ];
-    # Unfortunately doesn't seem to have an effect
-    postBuild = ''
-      wrapProgram $out/bin/telegram-desktop --set XCURSOR_SIZE 24
-    '';
-  };
+  signingPubKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII4oFL+qMOmADJ+KGZwQ13Ma65zcEcXuF4JYjNrjvIr5 nixos git commit signing for philipp.krueger1@gmail.com";
 
-  signingPubKey =
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII4oFL+qMOmADJ+KGZwQ13Ma65zcEcXuF4JYjNrjvIr5 nixos git commit signing for philipp.krueger1@gmail.com";
-
-  sessionPath =
-    [ "$HOME/.local/bin" "$HOME/.cargo/bin" "/home/philipp/.deno/bin" "$PATH" ];
+  sessionPath = [
+    "$HOME/.local/bin"
+    "$HOME/.cargo/bin"
+    "/home/philipp/.deno/bin"
+    "$PATH"
+  ];
 
   _1password = pkgs._1password-gui;
 
-in {
+in
+{
   home.username = "philipp";
   home.homeDirectory = "/home/philipp";
   home.stateVersion = "22.11";
 
   nixpkgs.config.allowUnfree = true;
   # I wish I knew what needed this. :|
-  nixpkgs.config.permittedInsecurePackages =
-    [ "electron-24.8.6" "electron-25.9.0" ];
+  nixpkgs.config.permittedInsecurePackages = [
+    "electron-24.8.6"
+    "electron-25.9.0"
+  ];
 
   home.sessionPath = sessionPath;
 
@@ -131,14 +133,12 @@ in {
   };
 
   # Let's also try this
-  programs.bash.initExtra =
-    "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
+  programs.bash.initExtra = "source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh";
 
   programs.home-manager.enable = true;
 
   # VSCode settings "sync"
-  home.file.".config/Code/User/settings.json".text =
-    builtins.readFile ./vscode/settings.json;
+  home.file.".config/Code/User/settings.json".text = builtins.readFile ./vscode/settings.json;
 
   # Git stuff
 
@@ -171,9 +171,13 @@ in {
     * ${signingPubKey}
   '';
 
-  programs.gh = { enable = true; };
+  programs.gh = {
+    enable = true;
+  };
 
-  programs.firefox = { enable = true; };
+  programs.firefox = {
+    enable = true;
+  };
 
   programs.obs-studio = {
     enable = true;
@@ -182,7 +186,6 @@ in {
 
   home.packages = [
     vscode
-    tdesktop
     _1password
     (pkgs.spotify.override { deviceScaleFactor = 2; })
     pkgs.discord
@@ -215,6 +218,7 @@ in {
     pkgs.cargo-make
     pkgs.cargo-watch
     pkgs.cargo-release
+    pkgs.cargo-semver-checks
     # (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
@@ -233,7 +237,7 @@ in {
     pkgs.prismlauncher # minecraft (with mods)
     pkgs.nfs-utils
     pkgs.nix-index
-    unstable.rust-analyzer
+    pkgs.rust-analyzer
     pkgs.shotcut
     pkgs.musescore
     pkgs.direnv
@@ -246,6 +250,8 @@ in {
 
   dconf.settings = {
     # Let gnome handle my time zone
-    "org/gnome/desktop/datetime" = { automatic-timezone = true; };
+    "org/gnome/desktop/datetime" = {
+      automatic-timezone = true;
+    };
   };
 }

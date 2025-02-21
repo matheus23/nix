@@ -2,8 +2,15 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, ... }: {
-  imports = [ # Include the results of the hardware scan.
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+{
+  imports = [
+    # Include the results of the hardware scan.
     ./hardware-configuration.nix
     # Manually added some quirks to fix WiFi
     <nixos-hardware/lenovo/thinkpad/t14/amd/gen3>
@@ -20,8 +27,7 @@
   # Enable virtual camera kernel module
 
   # Make some extra kernel modules available to NixOS
-  boot.extraModulePackages = with config.boot.kernelPackages;
-    [ v4l2loopback.out ];
+  boot.extraModulePackages = with config.boot.kernelPackages; [ v4l2loopback.out ];
 
   # Activate kernel modules (choose from built-ins and extra ones)
   boot.kernelModules = [
@@ -114,14 +120,18 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Krüger";
-    extraGroups = [ "networkmanager" "wheel" "docker" "adbusers" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "docker"
+      "adbusers"
+    ];
     packages = with pkgs; [ ];
   };
 
   # Home manager
   home-manager.useGlobalPkgs = true;
-  home-manager.users.philipp =
-    import /home/philipp/program/nix/home/home-manager/home.nix;
+  home-manager.users.philipp = import /home/philipp/program/nix/home/home-manager/home.nix;
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
@@ -207,8 +217,11 @@
   ];
 
   # For the above nix-ld stuff (openssl_1_1.out)
-  nixpkgs.config.permittedInsecurePackages =
-    [ "openssl-1.1.1u" "openssl-1.1.1w" "electron-25.9.0" ];
+  nixpkgs.config.permittedInsecurePackages = [
+    "openssl-1.1.1u"
+    "openssl-1.1.1w"
+    "electron-25.9.0"
+  ];
 
   nix.settings.experimental-features = "nix-command flakes";
 
