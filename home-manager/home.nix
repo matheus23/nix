@@ -192,7 +192,7 @@ in
     pkgs.zoom-us
     pkgs.chromium
     pkgs.yarn
-    pkgs.nodejs
+    pkgs.nodejs_23
     pkgs.nixfmt-rfc-style
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
