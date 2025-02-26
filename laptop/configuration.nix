@@ -85,7 +85,7 @@
   services.xserver.desktopManager.gnome.enable = true;
 
   # Configure keymap in X11
-  services.xserver = {
+  services.xserver.xkb = {
     layout = "de";
     xkbVariant = "";
   };
@@ -98,8 +98,8 @@
       RESTORE_THRESHOLDS_ON_BAT = 1;
       # CPU_BOOST_ON_AC = 1;
       # CPU_BOOST_ON_BAT = 0;
-      # CPU_SCALING_GOVERNOR_ON_AC = "performance";
-      # CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+      CPU_SCALING_GOVERNOR_ON_AC = "powersave";
+      CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
     };
   };
   # thermald for better performance?
@@ -158,7 +158,7 @@
     pkgs.wget
     pkgs.curl
     pkgs.gedit
-    pkgs.gnome.gnome-tweaks
+    pkgs.gnome-tweaks
     pkgs.vlc
     pkgs.usbutils
     pkgs.git
