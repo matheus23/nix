@@ -103,6 +103,7 @@
   };
   # thermald for better performance?
   services.thermald.enable = true;
+  # OOOOH yeah so much better, thank you https://github.com/NixOS/nixpkgs/issues/211345#issuecomment-1387032707
 
   # Configure console keymap
   console.keyMap = "de";
