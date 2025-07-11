@@ -23,8 +23,8 @@ let
         {
           name = "rust-analyzer";
           publisher = "rust-lang";
-          version = "0.4.2313";
-          sha256 = "0jsvqn6f0a9dlfjdh8m29g7smvi1ay6if2mlildwgibip4j2r5ha";
+          version = "0.4.2532";
+          sha256 = "0ijkwp1s4027bgbfd2d7jbdzq5wjwyq5qm3fh30kaz29h5szx297";
         }
         {
           name = "theme-atom-one-light";
@@ -184,6 +184,15 @@ in
     plugins = with pkgs.obs-studio-plugins; [ obs-backgroundremoval ];
   };
 
+  programs.atuin = {
+    enable = true;
+    enableBashIntegration = true;
+    settings = {
+      # Uncomment this to use your instance
+      # sync_address = "https://majiy00-shell.fly.dev";
+    };
+  };
+
   home.packages = [
     vscode
     _1password
@@ -219,6 +228,8 @@ in
     pkgs.cargo-watch
     pkgs.cargo-release
     pkgs.cargo-semver-checks
+    unstable.cargo-outdated
+    # pkgs.cargo-public-api # outdated, need to use cargo install cargo-public-api --locked version instead
     # (import ../custom/wesnoth.nix { pkgs = pkgs; })
     pkgs.figma-linux
     pkgs.kubo
@@ -246,6 +257,13 @@ in
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
     unstable.zed-editor
+    pkgs.code-cursor
+    unstable.claude-code
+    # these two are useful for building the openssl-sys rust crate, which is used in many places
+    pkgs.openssl
+    pkgs.pkg-config
+    pkgs.ldtk
+    pkgs.tig
   ];
 
   dconf.settings = {
