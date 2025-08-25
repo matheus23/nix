@@ -13,7 +13,6 @@
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "flake-utils";
     };
   };
 
@@ -101,7 +100,7 @@
         };
 
       # a shell for gtk development
-      devShell.gtk =
+      devShells.gtk =
         let
           pkgs = import nixpkgs { inherit system; };
           unstable = import nixpkgs-unstable { inherit system; };
@@ -127,7 +126,7 @@
         };
 
       # a shell for n0des development
-      devShell.n0des =
+      devShells.n0des =
         let
           pkgs = import nixpkgs { inherit system; };
           unstable = import nixpkgs-unstable { inherit system; };
