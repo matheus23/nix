@@ -23,8 +23,8 @@ let
         {
           name = "rust-analyzer";
           publisher = "rust-lang";
-          version = "0.4.2532";
-          sha256 = "0ijkwp1s4027bgbfd2d7jbdzq5wjwyq5qm3fh30kaz29h5szx297";
+          version = "0.4.2578";
+          sha256 = "0ycnh3dz8xr6wc2472dwi60b03pml0p8hscsr5z7nq52zxcd73n9";
         }
         {
           name = "theme-atom-one-light";
@@ -141,7 +141,6 @@ in
   home.file.".config/Code/User/settings.json".text = builtins.readFile ./vscode/settings.json;
 
   # Git stuff
-
   programs.git = {
     enable = true;
     userName = "Philipp Krüger";
@@ -184,14 +183,14 @@ in
     plugins = with pkgs.obs-studio-plugins; [ obs-backgroundremoval ];
   };
 
-  programs.atuin = {
-    enable = true;
-    enableBashIntegration = true;
-    settings = {
-      # Uncomment this to use your instance
-      # sync_address = "https://majiy00-shell.fly.dev";
-    };
-  };
+  # programs.atuin = {
+  #   enable = true;
+  #   enableBashIntegration = true;
+  #   settings = {
+  #     # Uncomment this to use your instance
+  #     # sync_address = "https://majiy00-shell.fly.dev";
+  #   };
+  # };
 
   home.packages = [
     vscode
@@ -201,7 +200,7 @@ in
     pkgs.zoom-us
     pkgs.chromium
     pkgs.yarn
-    pkgs.nodejs_23
+    pkgs.nodejs_24
     pkgs.nixfmt-rfc-style
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
@@ -215,7 +214,6 @@ in
     pkgs.steam-run
     pkgs.deno
     pkgs.slack
-    pkgs.brave
     pkgs.cargo-nextest
     pkgs.cargo-audit
     pkgs.cargo-deny
@@ -231,39 +229,41 @@ in
     unstable.cargo-outdated
     # pkgs.cargo-public-api # outdated, need to use cargo install cargo-public-api --locked version instead
     # (import ../custom/wesnoth.nix { pkgs = pkgs; })
-    pkgs.figma-linux
     pkgs.kubo
     # Fonts
     # (import ../custom/ideal-fonts.nix { pkgs = pkgs; }) # Couldn't get this to be picked up by figma-linux.
     pkgs.overpass
     pkgs.gimp
-    # pkgs.fuse3
     pkgs.protobuf
-    pkgs.tailscale
     pkgs.linuxKernel.packages.linux_6_1.perf # need to update this with the current compiler version
-    pkgs.hotspot
     pkgs.binaryen
-    # unstable.wasm-bindgen-cli
     pkgs.zig
     pkgs.prismlauncher # minecraft (with mods)
     pkgs.nfs-utils
     pkgs.nix-index
-    pkgs.rust-analyzer
-    pkgs.shotcut
-    pkgs.musescore
+    unstable.rust-analyzer
     pkgs.direnv
     pkgs.maestral
     pkgs.maestral-gui
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
     unstable.zed-editor
-    pkgs.code-cursor
     unstable.claude-code
     # these two are useful for building the openssl-sys rust crate, which is used in many places
     pkgs.openssl
     pkgs.pkg-config
-    pkgs.ldtk
     pkgs.tig
+
+    # "uninstalled" section
+
+    # pkgs.brave
+    # pkgs.figma-linux
+    # pkgs.tailscale
+    # pkgs.hotspot
+    # pkgs.shotcut
+    # pkgs.musescore
+    # pkgs.code-cursor
+    # pkgs.ldtk
   ];
 
   dconf.settings = {

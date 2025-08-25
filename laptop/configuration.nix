@@ -219,7 +219,7 @@
   programs.nix-ld.libraries = with pkgs; [
     stdenv.cc.cc
     zlib
-    fuse3
+    # fuse3
     icu
     zlib
     nss
