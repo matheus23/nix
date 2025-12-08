@@ -102,6 +102,7 @@
     "rust-analyzer.cargo.sysroot": "discover",
     "rust-analyzer.server.path": "/home/philipp/.nix-profile/bin/rust-analyzer",
     "rust-analyzer.rust.analyzerTargetDir": true,
+    "rust-analyzer.runnables.extraTestBinaryArgs": ["--nocapture"],
     "window.restoreFullscreen": true,
     "window.zoomLevel": 0.5
 }

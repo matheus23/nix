@@ -2,7 +2,7 @@
   description = "flakes";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-24.11";
+    nixpkgs.url = "nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
     # fixes https://github.com/NixOS/nixpkgs/issues/298285
     # using nixpkgs from that branch until it's merged
@@ -252,6 +252,35 @@
             }
             trap cleanup EXIT
           '';
+        };
+
+      # a shell for egui development
+      devShells.egui =
+        let
+          pkgs = import nixpkgs { inherit system; };
+          unstable = import nixpkgs-unstable { inherit system; };
+        in
+        pkgs.mkShell rec {
+          name = "egui";
+          nativeBuildInputs = with pkgs; [
+            cmake
+            pkg-config
+          ];
+
+          buildInputs = with pkgs; [
+            xorg.libX11
+            xorg.libXrandr
+            xorg.libXcursor
+            xorg.libXi
+            libxkbcommon
+            libGL
+            fontconfig
+            wayland
+          ];
+
+          LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath buildInputs;
+
+          shellHook = '''';
         };
 
     });

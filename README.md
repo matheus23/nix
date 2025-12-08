@@ -56,6 +56,10 @@ $ sudo nixos-rebuild switch --upgrade # not sure if that upgrade is needed or no
 
 Now pray that it works & reboot 8-)
 
+---
+
+Also: Update the nix versions used in the flakes (in `./flake.nix`) to match the current system version, otherwise [some graphical programs won't be able to find suitable windowing configurations](https://github.com/emilk/egui/issues/3516#issuecomment-1872618692).
+
 ## How to: Non-major Updates
 
 Sometimes I need new packages (signal-desktop, nodejs, etc.) and want to update them,

@@ -170,6 +170,8 @@ in
     * ${signingPubKey}
   '';
 
+  services.ssh-agent.enable = true;
+
   programs.gh = {
     enable = true;
   };
@@ -228,7 +230,8 @@ in
     pkgs.cargo-semver-checks
     unstable.cargo-outdated
     # pkgs.cargo-public-api # outdated, need to use cargo install cargo-public-api --locked version instead
-    # (import ../custom/wesnoth.nix { pkgs = pkgs; })
+    # (import ../custom/wesnoth.nix { pkgs = pkgs; }) # is not up-to-date enough for high DPI
+    pkgs.wesnoth
     pkgs.kubo
     # Fonts
     # (import ../custom/ideal-fonts.nix { pkgs = pkgs; }) # Couldn't get this to be picked up by figma-linux.
@@ -253,6 +256,10 @@ in
     pkgs.openssl
     pkgs.pkg-config
     pkgs.tig
+
+    pkgs.libreoffice
+    pkgs.wireshark
+    pkgs.clang_multi # jumping into a nix shell nixpkgs#clang_multi every time I want to compile ring to Wasm gets old
 
     # "uninstalled" section
 
