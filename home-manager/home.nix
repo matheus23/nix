@@ -23,8 +23,8 @@ let
         {
           name = "rust-analyzer";
           publisher = "rust-lang";
-          version = "0.4.2578";
-          sha256 = "0ycnh3dz8xr6wc2472dwi60b03pml0p8hscsr5z7nq52zxcd73n9";
+          version = "0.4.2710";
+          hash = "sha256-H3d1OiDW4mVIGowlWB+ShjJ+zbaWCtWFRzc41o8YYU8=";
         }
         {
           name = "theme-atom-one-light";
