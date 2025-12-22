@@ -284,32 +284,36 @@
         };
 
       # a shell for iroh-live development (includes AV & GPUI stuff)
-      devShells.iroh-live = pkgs.mkShell rec {
-        name = "iroh-live";
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-          # libpipewire
-          pipewire
-          # LIBCLANG_PATH
-          clang
-          rustPlatform.bindgenHook
-          # alsa.pc
-          alsa-lib
-          # egl.pc
-          libGL
-          # eglexternalplatform
-          # libtoolize, aclocal, autoconf bin, required by webrtc-audio-processing-sys crate build
-          libtool
-          automake
-          autoconf
-          # ffmpeg-sys-next requirements
-          ffmpeg
-          # iroh-live-gpui
-          libxkbcommon
-          libgbm
-          xorg.libxcb
-        ];
-      };
+      devShells.iroh-live =
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        pkgs.mkShell rec {
+          name = "iroh-live";
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            # libpipewire
+            pipewire
+            # LIBCLANG_PATH
+            clang
+            rustPlatform.bindgenHook
+            # alsa.pc
+            alsa-lib
+            # egl.pc
+            libGL
+            # eglexternalplatform
+            # libtoolize, aclocal, autoconf bin, required by webrtc-audio-processing-sys crate build
+            libtool
+            automake
+            autoconf
+            # ffmpeg-sys-next requirements
+            ffmpeg
+            # iroh-live-gpui
+            libxkbcommon
+            libgbm
+            xorg.libxcb
+          ];
+        };
 
     });
 
