@@ -315,6 +315,42 @@
           ];
         };
 
+      # a shell for anything that requires running playwright
+      devShells.playwright =
+        let
+          pkgs = import nixpkgs { inherit system; };
+          unstable = import nixpkgs-unstable { inherit system; };
+          pw-drivers = unstable.playwright-driver.browsers;
+        in
+        pkgs.mkShell {
+          name = "playwright";
+
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            openssl
+            pw-drivers # for e2e playwright tests. **Needs to be same the same version as playwright npm package**
+            bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
+          ];
+
+          # For playwright tests
+          PLAYWRIGHT_BROWSERS_PATH = "${pw-drivers}";
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+        };
+
+      # a shell for dioxus development
+      devShells.dioxus =
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        pkgs.mkShell {
+          name = "dioxus";
+
+          nativeBuildInputs = with pkgs; [
+            pkgs-config
+            openssl
+            dioxus-cli
+          ];
+        };
     });
 
 }

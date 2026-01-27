@@ -96,6 +96,13 @@ let
           version = "0.5.1";
           sha256 = "1m25bbgfv8x8f0ywadjwsmh4myqgp8xwf5yjrkskgr8axj8ny36a";
         }
+        {
+          # frontend coding AI thingie
+          name = "kombai";
+          publisher = "kombai";
+          version = "1.4.246";
+          hash = "sha256-O6HNF2Yfamq5uoimA+ud+K0m51sFI/4sfoZ5sXNY4hA=";
+        }
       ];
   };
 
@@ -260,6 +267,9 @@ in
     pkgs.libreoffice
     pkgs.wireshark
     pkgs.clang_multi # jumping into a nix shell nixpkgs#clang_multi every time I want to compile ring to Wasm gets old
+
+    pkgs.inkscape
+    pkgs.lld # I apparently need this for rustc now?
 
     # "uninstalled" section
 
