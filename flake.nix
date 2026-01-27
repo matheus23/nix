@@ -2,7 +2,7 @@
   description = "flakes";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-25.05";
+    nixpkgs.url = "nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
     # fixes https://github.com/NixOS/nixpkgs/issues/298285
     # using nixpkgs from that branch until it's merged
@@ -341,14 +341,15 @@
       devShells.dioxus =
         let
           pkgs = import nixpkgs { inherit system; };
+          unstable = import nixpkgs-unstable { inherit system; };
         in
         pkgs.mkShell {
           name = "dioxus";
 
           nativeBuildInputs = with pkgs; [
-            pkgs-config
+            pkg-config
             openssl
-            dioxus-cli
+            unstable.dioxus-cli
           ];
         };
     });
