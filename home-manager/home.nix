@@ -271,7 +271,7 @@ in
     pkgs.inkscape
     pkgs.lld # I apparently need this for rustc now?
 
-    pkgs.opencode
+    unstable.opencode
 
     # "uninstalled" section
 
