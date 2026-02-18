@@ -155,6 +155,7 @@
             openssl
             pw-drivers # for e2e playwright tests. **Needs to be same the same version as playwright npm package**
             bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
+            stripe-cli
           ];
 
           # TODO: These paths are all still relative. Should fix that
@@ -312,6 +313,11 @@
             libxkbcommon
             libgbm
             xorg.libxcb
+            vulkan-headers
+            vulkan-loader
+
+            libva # for cros-libva
+            nasm # for building rav1d
           ];
         };
 
@@ -350,6 +356,26 @@
             pkg-config
             openssl
             unstable.dioxus-cli
+
+            # a bunch of glib stuff
+            glib
+            cairo
+            pango
+            gdk-pixbuf
+            gtk3
+            # graphene
+            # gtksourceview5
+            # libadwaita
+
+            # atk seem to be required
+            atkmm
+
+            # webkitgtk
+            webkitgtk_4_1
+
+            # required for n0me
+            xdo
+            sqlite
           ];
         };
     });

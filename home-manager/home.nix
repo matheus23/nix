@@ -100,8 +100,8 @@ let
           # frontend coding AI thingie
           name = "kombai";
           publisher = "kombai";
-          version = "1.4.246";
-          hash = "sha256-O6HNF2Yfamq5uoimA+ud+K0m51sFI/4sfoZ5sXNY4hA=";
+          version = "1.4.272";
+          hash = "sha256-ZiqB4BtHLT46y1hICyxi+pAQu7Cw712gzt93LsBocNw=";
         }
       ];
   };
@@ -270,6 +270,8 @@ in
 
     pkgs.inkscape
     pkgs.lld # I apparently need this for rustc now?
+
+    pkgs.opencode
 
     # "uninstalled" section
 
