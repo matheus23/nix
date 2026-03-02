@@ -378,6 +378,44 @@
             sqlite
           ];
         };
+
+      # adapted from https://github.com/bevyengine/bevy/blob/latest/docs/linux_dependencies.md#nix
+      devShells.bevy =
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        with pkgs;
+        mkShell {
+          buildInputs = [
+            pkg-config
+          ]
+          ++ lib.optionals (lib.strings.hasInfix "linux" system) [
+            # for Linux
+            # Audio (Linux only)
+            alsa-lib
+            # Cross Platform 3D Graphics API
+            vulkan-loader
+            # For debugging around vulkan
+            vulkan-tools
+            # Other dependencies
+            libudev-zero
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+            libxkbcommon
+            wayland # had to add this myself
+            # meh let's just add this, it's really useful
+            tracy
+          ];
+          LD_LIBRARY_PATH = lib.makeLibraryPath [
+            vulkan-loader
+            xorg.libX11
+            xorg.libXi
+            xorg.libXcursor
+            libxkbcommon
+          ];
+        };
     });
 
 }
