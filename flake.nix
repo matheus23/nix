@@ -383,8 +383,6 @@
       devShells.bevy =
         let
           pkgs = import nixpkgs { inherit system; };
-          unstable = import nixpkgs-unstable { inherit system; };
-          # tracy = import ./custom/tracy.nix { inherit pkgs unstable; };
         in
         with pkgs;
         mkShell {
@@ -408,8 +406,7 @@
             libxkbcommon
             wayland # had to add this myself
             # meh let's just add this, it's really useful
-            tracy-glfw
-            libGL # needed for fixing tracy-glfw
+            tracy-wayland
             bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
           ];
           LD_LIBRARY_PATH = lib.makeLibraryPath [
@@ -418,7 +415,6 @@
             xorg.libXi
             xorg.libXcursor
             libxkbcommon
-            pkgs.libGL
           ];
         };
     });
