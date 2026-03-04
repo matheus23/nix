@@ -406,7 +406,8 @@
             libxkbcommon
             wayland # had to add this myself
             # meh let's just add this, it's really useful
-            tracy
+            tracy-wayland
+            bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
           ];
           LD_LIBRARY_PATH = lib.makeLibraryPath [
             vulkan-loader
