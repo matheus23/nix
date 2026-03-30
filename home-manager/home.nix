@@ -258,7 +258,7 @@ in
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
     unstable.zed-editor
-    unstable.claude-code
+    # unstable.claude-code # fails build currently
     # these two are useful for building the openssl-sys rust crate, which is used in many places
     pkgs.openssl
     pkgs.pkg-config
@@ -270,6 +270,7 @@ in
 
     pkgs.inkscape
     pkgs.lld # I apparently need this for rustc now?
+    pkgs.nftables
 
     unstable.opencode
 
