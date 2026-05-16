@@ -135,7 +135,7 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.philipp = {
     isNormalUser = true;
-    description = "Philipp Krüger";
+    description = "Philipp Pohl-Krüger";
     extraGroups = [
       "networkmanager"
       "wheel"

@@ -73,12 +73,15 @@
               libsoup_3.dev
               webkitgtk_4_1.dev
               # needed for rust android compilation (pnpm tauri android dev)
-              llvmPackages_13.libcxx
+              llvmPackages.libcxx
               libxml2
               jdk17
               # android development tools
               androidComposition.androidsdk
               bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
+              # for iroh-ble-transport
+              dbus
+              nasm
             ]
             ++ lib.optionals stdenv.isDarwin [
               darwin.apple_sdk.frameworks.Security
@@ -419,6 +422,8 @@
             libxkbcommon
           ];
         };
+
+      # ...
     });
 
 }
