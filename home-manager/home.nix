@@ -274,6 +274,10 @@ in
 
     unstable.opencode
 
+    # I really really hate aws-lc-rs. But I guess I need to install these now
+    pkgs.cmake
+    pkgs.go
+
     # "uninstalled" section
 
     # pkgs.brave
