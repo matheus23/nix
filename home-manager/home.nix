@@ -278,6 +278,8 @@ in
     pkgs.cmake
     pkgs.go
 
+    unstable.pi-coding-agent
+
     # "uninstalled" section
 
     # pkgs.brave
