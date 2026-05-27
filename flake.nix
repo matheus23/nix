@@ -435,9 +435,21 @@
             # LIBCLANG_PATH
             clang
             llvmPackages_20.libclang
+
+            vulkan-headers
+            vulkan-loader
+            vulkan-validation-layers
+            vulkan-tools        # vulkaninfo
+            shaderc             # GLSL to SPIRV compiler - glslc
+            renderdoc           # Graphics debugger
+            tracy               # Graphics profiler
+            vulkan-tools-lunarg # vkconfig
           ];
 
           LIBCLANG_PATH = "${pkgs.llvmPackages_20.libclang.lib}/lib";
+          LD_LIBRARY_PATH = "./target/llama-cmake-cache/6786a9086b197235/build/bin";
+          VULKAN_SDK = "${pkgs.vulkan-headers}";
+          VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
         };
 
       # ...

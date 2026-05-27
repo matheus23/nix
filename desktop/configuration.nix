@@ -110,6 +110,7 @@
   environment.systemPackages = with pkgs; [
   #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
   #  wget
+    snapper-gui
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -132,6 +133,20 @@
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+
+  # Snapper - btrfs snapshots for rollback
+  services.snapper.snapshotRootOnBoot = true;
+  services.snapper.configs.root = {
+    SUBVOLUME = "/";
+    ALLOW_USERS = [ "philipp" ];
+    TIMELINE_CREATE = true;
+    TIMELINE_CLEANUP = true;
+    TIMELINE_LIMIT_HOURLY = 24;
+    TIMELINE_LIMIT_DAILY = 5;
+    TIMELINE_LIMIT_WEEKLY = 3;
+    TIMELINE_LIMIT_MONTHLY = 3;
+    TIMELINE_LIMIT_YEARLY = 0;
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
