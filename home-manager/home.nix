@@ -150,12 +150,12 @@ in
   # Git stuff
   programs.git = {
     enable = true;
-    userName = "Philipp Krüger";
-    userEmail = "philipp.krueger1@gmail.com";
+    settings.user.name = "Philipp Krüger";
+    settings.user.email = "philipp.krueger1@gmail.com";
     signing.key = signingPubKey;
     signing.signByDefault = true;
 
-    extraConfig = {
+    settings = {
       init.defaultBranchName = "main";
       init.defaultbranch = "main";
       pull.ff = "only";
@@ -245,7 +245,7 @@ in
     pkgs.overpass
     pkgs.gimp
     pkgs.protobuf
-    pkgs.linuxKernel.packages.linux_6_1.perf # need to update this with the current compiler version
+    pkgs.perf
     pkgs.binaryen
     pkgs.zig
     pkgs.prismlauncher # minecraft (with mods)
