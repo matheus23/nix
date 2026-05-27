@@ -423,6 +423,23 @@
           ];
         };
 
+      # a shell for local-llm development
+      devShells.local-llm =
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        pkgs.mkShell rec {
+          name = "local-llm";
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            # LIBCLANG_PATH
+            clang
+            llvmPackages_20.libclang
+          ];
+
+          LIBCLANG_PATH = "${pkgs.llvmPackages_20.libclang.lib}/lib";
+        };
+
       # ...
     });
 
