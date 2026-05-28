@@ -423,13 +423,13 @@
           ];
         };
 
-      # a shell for local-llm development
-      devShells.local-llm =
+      # a shell for building llama.cpp
+      devShells.llama-cpp =
         let
           pkgs = import nixpkgs { inherit system; };
         in
         pkgs.mkShell rec {
-          name = "local-llm";
+          name = "llama-cpp";
           nativeBuildInputs = with pkgs; [
             pkg-config
             # LIBCLANG_PATH
