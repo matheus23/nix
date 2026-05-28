@@ -2,13 +2,17 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
+let
+  hermes-agent = builtins.getFlake "github:NousResearch/hermes-agent/ea5a6c216b99319353bddc99b2a1a0c1b2241b6d";
+in
 {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
       <home-manager/nixos>
+      hermes-agent.nixosModules.default
     ];
 
   # Bootloader.
@@ -161,6 +165,26 @@
     TIMELINE_LIMIT_MONTHLY = 3;
     TIMELINE_LIMIT_YEARLY = 0;
   };
+
+  services.hermes-agent = {
+    enable = true;
+    container.enable = false;
+
+    settings.model.base_url = "http://localhost:1234/v1";
+    settings.model.default = "qwen3.6-35b-a3b";
+
+    environmentFiles = [ "/var/lib/hermes/env" ];
+    addToSystemPackages = true;
+  };
+
+  systemd.services.hermes-agent.serviceConfig = {
+    IPAddressDeny = "any";
+    IPAddressAllow = [
+      "localhost"
+    ];
+    RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+  };
+
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
