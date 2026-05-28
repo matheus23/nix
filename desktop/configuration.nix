@@ -6,6 +6,10 @@
 
 let
   hermes-agent = builtins.getFlake "github:NousResearch/hermes-agent/ea5a6c216b99319353bddc99b2a1a0c1b2241b6d";
+
+  hermesSubnet = "172.30.0.0/24";
+  hermesGateway = "172.30.0.1"; # host address on this bridge
+  lmstudioPort = 1234;
 in
 {
   imports =
@@ -166,23 +170,74 @@ in
     TIMELINE_LIMIT_YEARLY = 0;
   };
 
+  systemd.services.docker-network-hermes = {
+    description = "Create the isolated docker network for hermes-agent";
+    after = [ "docker.service" "docker.socket" ];
+    requires = [ "docker.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ config.virtualisation.docker.package ];
+    script = ''
+      docker network inspect hermes-net >/dev/null 2>&1 || \
+        docker network create \
+          --driver bridge \
+          --subnet ${hermesSubnet} \
+          --gateway ${hermesGateway} \
+          hermes-net
+    '';
+  };
+
+  # LM Studio listens on 0.0.0.0:1234, so the container can reach it via the
+  # bridge gateway (the host). Allow that port from the hermes subnet on the
+  # INPUT path (host-directed traffic).
+  networking.firewall.extraInputRules = ''
+    ip saddr ${hermesSubnet} tcp dport ${toString lmstudioPort} accept
+  '';
+
+  # Egress isolation: the container reaches the internet via FORWARD, which
+  # docker routes through the DOCKER-USER chain. Drop all forwarded traffic
+  # from the hermes subnet (blocks internet) while allowing return traffic for
+  # already-established connections. Traffic to the host itself (LM Studio on
+  # the bridge gateway) goes through INPUT, not FORWARD, so it is unaffected.
+  networking.firewall.extraCommands = ''
+    # Idempotent: delete any prior copies before re-inserting at the top.
+    iptables -D DOCKER-USER -s ${hermesSubnet} -m state --state ESTABLISHED,RELATED -j RETURN 2>/dev/null || true
+    iptables -D DOCKER-USER -s ${hermesSubnet} -j DROP 2>/dev/null || true
+
+    iptables -I DOCKER-USER 1 -s ${hermesSubnet} -j DROP
+    iptables -I DOCKER-USER 1 -s ${hermesSubnet} -m state --state ESTABLISHED,RELATED -j RETURN
+  '';
+  networking.firewall.extraStopCommands = ''
+    iptables -D DOCKER-USER -s ${hermesSubnet} -m state --state ESTABLISHED,RELATED -j RETURN 2>/dev/null || true
+    iptables -D DOCKER-USER -s ${hermesSubnet} -j DROP 2>/dev/null || true
+  '';
+
   services.hermes-agent = {
     enable = true;
-    container.enable = false;
 
-    settings.model.base_url = "http://localhost:1234/v1";
+    container.enable = true;
+    container.backend = "docker";
+
+    container.extraOptions = [
+      "--network=hermes-net"
+      "--add-host=host.docker.internal:host-gateway"
+    ];
+
+    container.hostUsers = [ "philipp" ];
+
+    settings.model.base_url = "http://host.docker.internal:${toString lmstudioPort}/v1";
     settings.model.default = "qwen3.6-35b-a3b";
 
     environmentFiles = [ "/var/lib/hermes/env" ];
     addToSystemPackages = true;
   };
 
-  systemd.services.hermes-agent.serviceConfig = {
-    IPAddressDeny = "any";
-    IPAddressAllow = [
-      "localhost"
-    ];
-    RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+  systemd.services.hermes-agent = {
+    after = [ "docker-network-hermes.service" ];
+    requires = [ "docker-network-hermes.service" ];
   };
 
 
