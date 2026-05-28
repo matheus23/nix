@@ -281,6 +281,10 @@ in
     unstable.pi-coding-agent
     (pkgs.callPackage ../custom/lmstudio/package.nix { })
 
+    # two nix language servers that help with getting zed nix integration going
+    pkgs.nil
+    pkgs.nixd
+
     # "uninstalled" section
 
     # pkgs.brave
