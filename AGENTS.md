@@ -8,7 +8,7 @@ This is a personal NixOS configuration repository, not an application codebase. 
 - `desktop/configuration.nix` — Desktop system config (stateVersion 25.11)
 - `laptop/configuration.nix` — Laptop system config (stateVersion 22.11)
 - `home-manager/home.nix` — Shared home-manager config (user: `philipp`)
-- `custom/*.nix` — Custom package overrides (wesnoth, tracy, ideal-fonts)
+- `custom/*.nix` — Custom package overrides (wesnoth, tracy, ideal-fonts, lmstudio)
 - `scripts/` — Helper scripts
 
 ## Critical Path Differences
@@ -72,3 +72,7 @@ The `n0des` shell auto-manages a local PostgreSQL instance:
 - `bashInteractive` is included in most devShells to fix VS Code terminal issues on NixOS.
 - `permittedInsecurePackages` includes old electron and openssl versions — required by some packages.
 - Flakes are enabled via `nix.settings.experimental-features = "nix-command flakes"` in both machine configs.
+
+## Custom lmstudio Package
+
+`custom/lmstudio/package.nix` overrides the nixpkgs version (used in `home-manager/home.nix`). To update: find the latest version from `curl -ILs -o /dev/null -w '%{url_effective}' "https://lmstudio.ai/download/latest/linux/x64"`, compute the hash with `nix-prefetch-url --type sha256 "<url>"`, then update `version` and `hash` in the package file. The URL pattern is `https://installers.lmstudio.ai/linux/x64/<version>/LM-Studio-<version>-x64.AppImage`.
