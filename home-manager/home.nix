@@ -279,7 +279,7 @@ in
     pkgs.go
 
     unstable.pi-coding-agent
-    unstable.lmstudio
+    (pkgs.callPackage ../custom/lmstudio/package.nix { })
 
     # "uninstalled" section
 

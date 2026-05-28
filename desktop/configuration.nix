@@ -89,6 +89,14 @@
     packages = with pkgs; [
       home-manager
       rustup
+      wget
+      curl
+      gnome-tweaks
+      vlc
+      usbutils
+      git
+      gcc
+      gnumake
     ];
   };
 
