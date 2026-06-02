@@ -427,12 +427,30 @@
       devShells.llama-cpp =
         let
           pkgs = import nixpkgs { inherit system; };
+          # CMake's FindVulkan.cmake looks for:
+          #   $VULKAN_SDK/include/vulkan/vulkan.h  (from vulkan-headers)
+          #   $VULKAN_SDK/lib/libvulkan.so         (from vulkan-loader)
+          # The patched ggml-vulkan CMakeLists also appends $VULKAN_SDK to
+          # CMAKE_PREFIX_PATH so find_package(SPIRV-Headers CONFIG) succeeds,
+          # which requires:
+          #   $VULKAN_SDK/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake
+          #                                        (from spirv-headers)
+          vulkan-combined = pkgs.symlinkJoin {
+            name = "vulkan-combined";
+            paths = with pkgs; [
+              vulkan-headers
+              vulkan-loader
+              spirv-headers
+            ];
+          };
         in
         pkgs.mkShell rec {
           name = "llama-cpp";
           nativeBuildInputs = with pkgs; [
             pkg-config
-            # LIBCLANG_PATH
+            cmake
+            ninja
+            # LIBCLANG_PATH - keep clang on PATH for compiler, libclang for bindgen
             clang
             llvmPackages_20.libclang
 
@@ -440,15 +458,18 @@
             vulkan-loader
             vulkan-validation-layers
             vulkan-tools        # vulkaninfo
-            shaderc             # GLSL to SPIRV compiler - glslc
+            shaderc.bin         # glslc - required by find_package(Vulkan COMPONENTS glslc REQUIRED)
+            spirv-headers
             renderdoc           # Graphics debugger
             tracy               # Graphics profiler
             vulkan-tools-lunarg # vkconfig
           ];
 
           LIBCLANG_PATH = "${pkgs.llvmPackages_20.libclang.lib}/lib";
-          LD_LIBRARY_PATH = "./target/llama-cmake-cache/6786a9086b197235/build/bin";
-          VULKAN_SDK = "${pkgs.vulkan-headers}";
+          # vulkan-loader needed at runtime to dlopen libvulkan.so
+          LD_LIBRARY_PATH = "${pkgs.vulkan-loader}/lib";
+          # Single SDK root with headers, loader, and SPIRV-Headers cmake config
+          VULKAN_SDK = "${vulkan-combined}";
           VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
         };
 
