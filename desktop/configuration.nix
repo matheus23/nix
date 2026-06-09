@@ -10,7 +10,7 @@
 }:
 
 let
-  # hermes-agent = builtins.getFlake "github:NousResearch/hermes-agent/ea5a6c216b99319353bddc99b2a1a0c1b2241b6d";
+  hermes-agent = builtins.getFlake "github:NousResearch/hermes-agent/ea5a6c216b99319353bddc99b2a1a0c1b2241b6d";
 
   # hermesSubnet = "172.30.0.0/24";
   # hermesGateway = "172.30.0.1"; # host address on this bridge
@@ -21,14 +21,14 @@ in
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
     <home-manager/nixos>
-    # hermes-agent.nixosModules.default
+    hermes-agent.nixosModules.default
   ];
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "nixos"; # Define your hostname.
+  networking.hostName = "philipps-desktop"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Configure network proxy if necessary
@@ -101,6 +101,7 @@ in
     extraGroups = [
       "networkmanager"
       "wheel"
+      "i2c"
     ];
     packages = with pkgs; [
       home-manager
@@ -113,6 +114,7 @@ in
       git
       gcc
       gnumake
+      openrgb
     ];
   };
 
@@ -156,6 +158,17 @@ in
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
 
+  # Load i2c_dev kernel module for OpenRGB I2C/SMBus access
+  boot.extraModprobeConfig = ''
+    options i2c_dev major=89
+  '';
+  boot.kernelModules = [ "i2c_dev" ];
+
+  # I2C device permissions for OpenRGB
+  services.udev.extraRules = ''
+    SUBSYSTEM=="i2c-dev", GROUP="i2c", MODE="0660"
+  '';
+
   # Open ports in the firewall.
   networking.firewall.allowedTCPPorts = [
     1234 # lmstudio
@@ -168,6 +181,18 @@ in
   services.snapper.snapshotRootOnBoot = true;
   services.snapper.configs.root = {
     SUBVOLUME = "/";
+    ALLOW_USERS = [ "philipp" ];
+    TIMELINE_CREATE = true;
+    TIMELINE_CLEANUP = true;
+    TIMELINE_LIMIT_HOURLY = 24;
+    TIMELINE_LIMIT_DAILY = 5;
+    TIMELINE_LIMIT_WEEKLY = 3;
+    TIMELINE_LIMIT_MONTHLY = 3;
+    TIMELINE_LIMIT_YEARLY = 0;
+  };
+
+  services.snapper.configs.home = {
+    SUBVOLUME = "/home";
     ALLOW_USERS = [ "philipp" ];
     TIMELINE_CREATE = true;
     TIMELINE_CLEANUP = true;
@@ -226,25 +251,26 @@ in
   #   iptables -D DOCKER-USER -s ${hermesSubnet} -j DROP 2>/dev/null || true
   # '';
 
-  # services.hermes-agent = {
-  #   enable = true;
+  services.hermes-agent = {
+    enable = true;
 
-  #   container.enable = true;
-  #   container.backend = "docker";
+    container.enable = true;
+    # container.backend = "docker";
 
-  #   container.extraOptions = [
-  #     "--network=hermes-net"
-  #     "--add-host=host.docker.internal:host-gateway"
-  #   ];
+    # container.extraOptions = [
+    #   "--network=hermes-net"
+    #   "--add-host=host.docker.internal:host-gateway"
+    # ];
 
-  #   container.hostUsers = [ "philipp" ];
+    container.hostUsers = [ "philipp" ];
 
-  #   settings.model.base_url = "http://host.docker.internal:${toString lmstudioPort}/v1";
-  #   settings.model.default = "qwen3.6-35b-a3b";
+    # settings.model.base_url = "http://host.docker.internal:${toString lmstudioPort}/v1";
+    settings.model.base_url = "http://localhost:1234/v1";
+    settings.model.default = "qwen3.6-35b-a3b";
 
-  #   environmentFiles = [ "/var/lib/hermes/env" ];
-  #   addToSystemPackages = true;
-  # };
+    environmentFiles = [ "/var/lib/hermes/env" ];
+    addToSystemPackages = true;
+  };
 
   # systemd.services.hermes-agent = {
   #   after = [ "docker-network-hermes.service" ];

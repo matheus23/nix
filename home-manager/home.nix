@@ -204,7 +204,7 @@ in
   home.packages = [
     # vscode
     _1password
-    (pkgs.spotify.override { deviceScaleFactor = 2; })
+    (unstable.spotify.override { deviceScaleFactor = 2; })
     pkgs.discord
     pkgs.zoom-us
     pkgs.chromium
@@ -280,7 +280,8 @@ in
 
     unstable.pi-coding-agent
     (pkgs.callPackage ../custom/lmstudio/package.nix { })
-    (pkgs.callPackage ../custom/mnemosyne/package.nix { })
+    # (pkgs.callPackage ../custom/mnemosyne/package.nix { })
+    unstable.claude-code
 
     # two nix language servers that help with getting zed nix integration going
     pkgs.nil
