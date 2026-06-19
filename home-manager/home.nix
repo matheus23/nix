@@ -165,7 +165,7 @@ in
     pkgs.lld # I apparently need this for rustc now?
     pkgs.nftables
 
-    unstable.opencode
+    (pkgs.callPackage ../custom/opencode/package.nix { })
 
     # I really really hate aws-lc-rs. But I guess I need to install these now
     pkgs.cmake

@@ -1,0 +1,12 @@
+--- a/packages/opencode/script/build.ts
++++ b/packages/opencode/script/build.ts
+@@ -49,6 +49,9 @@ const createEmbeddedWebUIBundle = async () => {
+ 
+ const embeddedFileMap = skipEmbedWebUi ? null : await createEmbeddedWebUIBundle()
+ 
++// Write to disk so Bun can resolve it as an entrypoint
++if (embeddedFileMap) await Bun.write("opencode-web-ui.gen.ts", embeddedFileMap)
++
+ const allTargets: {
+   os: string
+   arch: "arm64" | "x64"
