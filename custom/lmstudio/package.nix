@@ -7,11 +7,11 @@
 }:
 let
   pname = "lmstudio";
-  version = "0.4.14-4";
+  version = "0.4.16-2";
 
   src = fetchurl {
     url = "https://installers.lmstudio.ai/linux/x64/${version}/LM-Studio-${version}-x64.AppImage";
-    hash = "sha256-oDPL/m1Ghutxmi3iumsy2/Hs6Bp8UDWsJeup1Vlu/i8=";
+    hash = "sha256-faLtj/9M59KRdEMHHgTCPLG4Gl5C7hkdAgmaS/O5rOk=";
   };
 
   appimageContents = appimageTools.extractType2 { inherit pname version src; };
@@ -57,9 +57,6 @@ appimageTools.wrapType2 {
 
     install -m 755 ${appimageContents}/resources/app/.webpack/lms $out/bin/
 
-    patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}" \
-    --set-rpath "${lib.getLib stdenv.cc.cc}/lib:${lib.getLib stdenv.cc.cc}/lib64:$out/lib:${
-      lib.makeLibraryPath [ (lib.getLib stdenv.cc.cc) ]
-    }" $out/bin/lms
+    patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}" $out/bin/lms
   '';
 }

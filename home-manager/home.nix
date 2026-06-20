@@ -166,6 +166,7 @@ in
     pkgs.nftables
 
     (pkgs.callPackage ../custom/opencode/package.nix { })
+    unstable.nono # sandbox for agents
 
     # I really really hate aws-lc-rs. But I guess I need to install these now
     pkgs.cmake
