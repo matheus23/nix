@@ -114,6 +114,9 @@
   # Install firefox.
   programs.firefox.enable = true;
 
+  # Install adb
+  programs.adb.enable = true;
+
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
@@ -121,6 +124,8 @@
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     snapper-gui
+    socat
+    bubblewrap
   ];
 
   # needed for steam?
