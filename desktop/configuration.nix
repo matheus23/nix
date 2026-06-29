@@ -147,7 +147,7 @@
   # List services that you want to enable:
 
   # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
+  services.openssh.enable = true;
 
   # Load i2c_dev kernel module for OpenRGB I2C/SMBus access
   boot.extraModprobeConfig = ''

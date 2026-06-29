@@ -167,6 +167,7 @@ in
 
     (pkgs.callPackage ../custom/opencode/package.nix { })
     unstable.nono # sandbox for agents
+    (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
 
     # I really really hate aws-lc-rs. But I guess I need to install these now
     pkgs.cmake
@@ -180,6 +181,8 @@ in
     # two nix language servers that help with getting zed nix integration going
     pkgs.nil
     pkgs.nixd
+
+    pkgs.libnotify # for notify-send utility
 
     # "uninstalled" section
 
