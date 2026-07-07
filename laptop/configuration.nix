@@ -169,6 +169,7 @@
     pkgs.home-manager
     pkgs.rsync
     pkgs.pavucontrol
+    (pkgs.callPackage ../custom/pigeons/package.nix { })
   ];
 
   virtualisation.docker.enable = true;
