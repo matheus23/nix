@@ -174,6 +174,7 @@ in
     pkgs.go
 
     unstable.pi-coding-agent
+    (pkgs.callPackage ../custom/btrfs-snap-scrub/package.nix { })
     (pkgs.callPackage ../custom/lmstudio/package.nix { })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
