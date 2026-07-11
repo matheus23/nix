@@ -73,7 +73,8 @@ in
     * ${signingPubKey}
   '';
 
-  services.ssh-agent.enable = true;
+  # we already have an ssh agent via gnome keyring
+  # services.ssh-agent.enable = true;
 
   programs.gh = {
     enable = true;
@@ -167,7 +168,8 @@ in
     pkgs.lld # I apparently need this for rustc now?
     pkgs.nftables
 
-    (pkgs.callPackage ../custom/opencode/package.nix { })
+    # (pkgs.callPackage ../custom/opencode/package.nix { }) # seems to be broken on some download
+    unstable.opencode
     unstable.nono # sandbox for agents
     (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
 

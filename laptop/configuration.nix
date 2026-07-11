@@ -24,6 +24,15 @@
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
+  # this was needed to get gnome-keyring to actually be able to
+  # have wayland access and be able to show a dialog for auth
+  systemd.user.services.gcr-ssh-agent = {
+    Unit = {
+      After = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
+  };
+
   # Enable virtual camera kernel module
 
   # Make some extra kernel modules available to NixOS
@@ -139,7 +148,7 @@
     extraGroups = [
       "networkmanager"
       "wheel"
-      "docker"
+      # "docker" # had to disable docker after 25.11, but .. this gives the philipp user a sudo workaround it really shouldn't have anyways...
       "adbusers"
     ];
     packages = with pkgs; [ ];
@@ -172,7 +181,7 @@
     (pkgs.callPackage ../custom/pigeons/package.nix { })
   ];
 
-  virtualisation.docker.enable = true;
+  # virtualisation.docker.enable = true; # couldn't enable after 25.11 update
 
   programs.steam = {
     enable = true;
@@ -202,7 +211,7 @@
   fonts.packages = with pkgs; [
     noto-fonts
     noto-fonts-cjk-sans
-    noto-fonts-emoji
+    noto-fonts-color-emoji
     liberation_ttf
     fira-code
     fira-code-symbols
