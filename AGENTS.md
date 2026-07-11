@@ -19,9 +19,11 @@ Laptop imports from `/home/philipp/program/nix/home/home-manager/home.nix`. Thes
 ## Rebuilding the System
 
 ```sh
-sudo nixos-rebuild switch          # rebuild current machine
-sudo nixos-rebuild switch --upgrade  # also update nixpkgs channels
+sudo -E nixos-rebuild switch          # rebuild current machine
+sudo -E nixos-rebuild switch --upgrade  # also update nixpkgs channels
 ```
+
+`-E` is required: the `pigeons` package (`custom/pigeons/package.nix`) uses `builtins.fetchGit` over SSH to fetch a private repo at evaluation time, which runs as root under `sudo` and needs `SSH_AUTH_SOCK` forwarded from your ssh-agent (GNOME keyring). If you ever drop the SSH-fetched pigeons source, you can go back to plain `sudo nixos-rebuild switch`.
 
 After a rebuild, reboot if kernel or bootloader changed.
 

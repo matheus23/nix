@@ -29,6 +29,8 @@ in
 
   home.sessionPath = sessionPath;
 
+  home.sessionVariables.SSH_AUTH_SOCK = "\${XDG_RUNTIME_DIR}/gcr/ssh";
+
   # I hoped that this fixes home.sessionPath for me under gnome
   # It doesn't.
   home.file.".profile" = {

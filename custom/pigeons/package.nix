@@ -21,7 +21,7 @@ let
   src = builtins.fetchGit {
     url = "ssh://git@github.com/n0-computer/pigeons.git";
     ref = "refs/heads/main";
-    rev = "1585f152a4dc97553d3cf8b753c7f02b3a3a9ef6";
+    rev = "0685098c954cc7bf10f008dbce697b3a834db58b";
     shallow = true;
   };
 in
@@ -31,7 +31,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   inherit src;
 
-  cargoHash = "sha256-6jfGZNsjqgUY/Yt1Ts64Q2vIB6j5urmMWfFHT+Rhr6U=";
+  cargoHash = "sha256-I9hW0UCFC5eWu/ECs55XsSB3FTKbGQPsy07SskMSbOo=";
 
   meta = {
     description = "carrier pigeons for your SSH connections — SSH without an IP, behind NAT/firewall";
