@@ -29,8 +29,6 @@ in
 
   home.sessionPath = sessionPath;
 
-  home.sessionVariables.SSH_AUTH_SOCK = "\${XDG_RUNTIME_DIR}/gcr/ssh";
-
   # I hoped that this fixes home.sessionPath for me under gnome
   # It doesn't.
   home.file.".profile" = {
@@ -153,6 +151,7 @@ in
     pkgs.maestral-gui
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
+    pkgs.tmux
     unstable.zed-editor
     # unstable.claude-code # fails build currently
     # these two are useful for building the openssl-sys rust crate, which is used in many places

@@ -50,6 +50,7 @@ in
 
   # Enable the GNOME Desktop Environment.
   services.displayManager.gdm.enable = true;
+  services.displayManager.gdm.autoSuspend = false;
   services.desktopManager.gnome.enable = true;
 
   # Configure keymap in X11
@@ -158,8 +159,8 @@ in
   # Tail logs with: journalctl -u pigeons -f
   systemd.services.pigeons = {
     description = "pigeons roost — carrier pigeon SSH tunnel";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
+    after = [ "network-online.target" "NetworkManager-wait-online.service" "nss-lookup.target" ];
+    wants = [ "network-online.target" "NetworkManager-wait-online.service" "nss-lookup.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
