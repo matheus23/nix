@@ -8,6 +8,10 @@
   lib,
   ...
 }:
+
+let
+  pigeons = pkgs.callPackage ../custom/pigeons/package.nix { };
+in
 {
   imports = [
     # Include the results of the hardware scan.
@@ -260,8 +264,28 @@
 
   # List services that you want to enable:
 
+  # pigeons roost: always-on carrier pigeon for SSH. Runs as root at boot, so
+  # the endpoint ID is published to /etc/pigeons/endpoint_id and readable via
+  # `pigeons service status`. Do NOT also run `pigeons service install` — the
+  # unit is defined here declaratively. Restart with:
+  #   sudo systemctl restart pigeons
+  # Tail logs with: journalctl -u pigeons -f
+  systemd.services.pigeons = {
+    description = "pigeons roost — carrier pigeon SSH tunnel";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      Environment = "RUST_LOG=info";
+      ExecStart = "${pigeons}/bin/pigeons roost";
+      Restart = "on-failure";
+      RestartSec = 3;
+    };
+  };
+
   # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
+  services.openssh.enable = true;
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
