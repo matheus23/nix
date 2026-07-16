@@ -176,6 +176,7 @@ in
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
+  services.openssh.settings.PasswordAuthentication = false;
 
   # Load i2c_dev kernel module for OpenRGB I2C/SMBus access
   boot.extraModprobeConfig = ''
