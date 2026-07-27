@@ -20,12 +20,15 @@ in
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  boot.kernelPackages = pkgs.linuxPackages_6_18; # needed to fix WiFi driver not advertising P2P-device
 
   networking.hostName = "philipps-desktop"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Enable networking
   networking.networkmanager.enable = true;
+
+  services.dbus.packages = [ pkgs.miraclecast ];
 
   # Set your time zone.
   time.timeZone = "Europe/Berlin";
@@ -162,8 +165,16 @@ in
   # Tail logs with: journalctl -u pigeons -f
   systemd.services.pigeons = {
     description = "pigeons roost — carrier pigeon SSH tunnel";
-    after = [ "network-online.target" "NetworkManager-wait-online.service" "nss-lookup.target" ];
-    wants = [ "network-online.target" "NetworkManager-wait-online.service" "nss-lookup.target" ];
+    after = [
+      "network-online.target"
+      "NetworkManager-wait-online.service"
+      "nss-lookup.target"
+    ];
+    wants = [
+      "network-online.target"
+      "NetworkManager-wait-online.service"
+      "nss-lookup.target"
+    ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
