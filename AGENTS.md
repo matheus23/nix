@@ -8,7 +8,7 @@ This is a personal NixOS configuration repository, not an application codebase. 
 - `desktop/configuration.nix` — Desktop system config (stateVersion 25.11)
 - `laptop/configuration.nix` — Laptop system config (stateVersion 22.11)
 - `home-manager/home.nix` — Shared home-manager config (user: `philipp`)
-- `custom/*.nix` — Custom package overrides (wesnoth, tracy, ideal-fonts, lmstudio)
+- `custom/*.nix` — Custom package overrides (wesnoth, tracy, ideal-fonts, lmstudio, letta-code, mnemosyne)
 - `scripts/` — Helper scripts
 
 ## Critical Path Differences
@@ -97,3 +97,32 @@ Gotchas:
 - Importing `mnemosyne` eagerly runs `init_db()`, which tries to create a DB dir under `$HOME` (unwritable `/homeless-shelter` in the sandbox). The package works around this by setting `MNEMOSYNE_DATA_DIR` to a temp dir in `postFixup` (the `pythonImportsCheck` runs right after `fixupPhase`).
 - At first runtime use, `fastembed` downloads the `bge-small-en-v1.5` embedding model from HuggingFace into the data dir (default `~/.hermes/mnemosyne/data`, override with `MNEMOSYNE_DATA_DIR`). It is not bundled in the Nix package.
 - For MCP clients (Cursor, Claude Code, Codex, etc.), point them at `command: "mnemosyne", args: ["mcp"]`.
+
+## Custom letta-code Package
+
+`custom/letta-code/package.nix` packages [letta-ai/letta-code](https://github.com/letta-ai/letta-code) (npm `@letta-ai/letta-code`) as a `buildNpmPackage`, exposing the `letta` CLI. It's installed via `home-manager/home.nix`. The package fetches the pre-built npm tarball (no source build needed), installs runtime dependencies via `npm ci`, and wraps the `letta` binary with `git` and `ripgrep` on PATH.
+
+To bump the version:
+1. Update `version` in the package file.
+2. Recompute the tarball hash:
+   ```sh
+   nix-prefetch-url --type sha256 "https://registry.npmjs.org/@letta-ai/letta-code/-/letta-code-<version>.tgz"
+   nix hash convert --to sri --hash-algo sha256 <hash-from-above>
+   ```
+3. Update `hash` in the package file.
+4. Regenerate the vendored `package-lock.json`:
+   ```sh
+   cd /tmp && mkdir lc && cd lc
+   curl -sL "https://registry.npmjs.org/@letta-ai/letta-code/-/letta-code-<version>.tgz" | tar xz
+   cd package
+   nix-shell -p nodejs_22 --run "npm install --package-lock-only --ignore-scripts --legacy-peer-deps --cache /tmp/lc-cache"
+   cp package-lock.json /home/philipp/program/nix/custom/letta-code/package-lock.json
+   ```
+5. Set `npmDepsHash = lib.fakeHash`, build with `nix-build -E 'with import <nixpkgs> {}; callPackage ./custom/letta-code/package.nix {}'`, and paste the `got: sha256-...` from the error.
+
+Gotchas:
+- The npm tarball doesn't ship a `package-lock.json` — one is vendored at `custom/letta-code/package-lock.json` and copied in via `postPatch`.
+- The tarball's `prepare` script (`node .husky/install.mjs`) references `.husky/` which isn't shipped; it's stripped from `package.json` in `postPatch` to prevent `npm pack --dry-run` from failing.
+- `react@18.2.0` conflicts with `@pierre/diffs`'s peer dep (`^18.3.1 || ^19.0.0`); `--legacy-peer-deps` is passed via `npmFlags`.
+- Native modules (`sharp`, `node-pty`) are compiled during `npm rebuild` in the build sandbox.
+- The CLI creates `~/.letta/` at first run for settings and agent state.

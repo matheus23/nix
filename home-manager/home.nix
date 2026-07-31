@@ -14,6 +14,8 @@ let
 
   _1password = pkgs._1password-gui;
 
+  letta-code = pkgs.callPackage ../custom/letta-code/package.nix { };
+
 in
 {
   home.username = "philipp";
@@ -179,6 +181,8 @@ in
     unstable.pi-coding-agent
     (pkgs.callPackage ../custom/btrfs-snap-scrub/package.nix { })
     (pkgs.callPackage ../custom/lmstudio/package.nix { })
+    letta-code
+    (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
 
