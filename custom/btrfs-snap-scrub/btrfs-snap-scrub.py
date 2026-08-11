@@ -232,12 +232,19 @@ def referencing_inodes(fs, vaddr):
     Uses LOGICAL_INO_V2 with ignore_offset (kernel >= 4.15) so that any inode
     referencing any block of the extent is returned. Retries with a larger
     buffer when the kernel reports truncated results.
+
+    Returns an empty list if the kernel reports ENOENT — the extent was freed
+    between the tree search and this ioctl call (race on a live filesystem).
+    A gone extent has no references, so it's safe to skip.
     """
     bufsize = 4096
     while True:
-        inodes, missing = btrfs.ioctl.logical_ino_v2(
-            fs.fd, vaddr, bufsize=bufsize, ignore_offset=True
-        )
+        try:
+            inodes, missing = btrfs.ioctl.logical_ino_v2(
+                fs.fd, vaddr, bufsize=bufsize, ignore_offset=True
+            )
+        except FileNotFoundError:
+            return []
         if missing == 0 or bufsize >= 16 * 1024 * 1024:
             return inodes
         bufsize = min(bufsize + missing, 16 * 1024 * 1024)

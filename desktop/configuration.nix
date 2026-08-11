@@ -22,6 +22,15 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.kernelPackages = pkgs.linuxPackages_6_18; # needed to fix WiFi driver not advertising P2P-device
 
+  # Expand GPU-visible memory for ROCm on Strix Halo (gfx1151).
+  # Default GTT aperture is ~62 GB; ds4 needs ~124 GB for the 60 GiB model + runtime buffers.
+  boot.kernelParams = [
+    "amd_iommu=off"
+    "amdgpu.gttsize=126976"
+    "ttm.pages_limit=32505856"
+    "ttm.page_pool_size=32505856"
+  ];
+
   networking.hostName = "philipps-desktop"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -175,13 +184,37 @@ in
       "NetworkManager-wait-online.service"
       "nss-lookup.target"
     ];
-    wantedBy = [ "multi-user.target" ];
+    wantedBy = [ ]; # manual start only: sudo systemctl start ds4-server
     serviceConfig = {
       Type = "simple";
       Environment = "RUST_LOG=info";
       ExecStart = "${pigeons}/bin/pigeons roost";
       Restart = "on-failure";
       RestartSec = 3;
+    };
+  };
+
+  # ds4 inference server — DeepSeek V4 Flash on ROCm (Strix Halo).
+  # Serves OpenAI/Anthropic-compatible HTTP API on 127.0.0.1:8000.
+  # Logs: journalctl -u ds4-server -f
+  # Models live in ~/.lmstudio/models/antirez/deepseekV4Flash/
+  systemd.services.ds4-server = {
+    description = "ds4 inference server (DeepSeek V4 Flash, ROCm)";
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      User = "philipp";
+      Group = "users";
+      SupplementaryGroups = [
+        "render"
+        "video"
+      ];
+      ExecStart = "/home/philipp/.nix-profile/bin/ds4-server --rocm --host 127.0.0.1 --port 8421 -m /home/philipp/.lmstudio/models/antirez/deepseekV4Flash/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2-imatrix.gguf --mtp /home/philipp/.lmstudio/models/antirez/deepseekV4Flash/DeepSeek-V4-Flash-DSpark-support.gguf --dspark --ctx 409600 --kv-disk-dir /home/philipp/.ds4/server-kv --kv-disk-space-mb 8192";
+      Restart = "on-failure";
+      RestartSec = 10;
+      # Model loads in under a minute
+      TimeoutStartSec = 120;
     };
   };
 

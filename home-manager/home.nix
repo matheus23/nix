@@ -185,6 +185,7 @@ in
     (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
+    (unstable.callPackage ../custom/ds4/package.nix { })
 
     # two nix language servers that help with getting zed nix integration going
     pkgs.nil
