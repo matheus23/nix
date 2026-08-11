@@ -201,7 +201,7 @@ in
   systemd.services.ds4-server = {
     description = "ds4 inference server (DeepSeek V4 Flash, ROCm)";
     after = [ "network.target" ];
-    wantedBy = [ "multi-user.target" ];
+    wantedBy = [ ]; # manual start only: sudo systemctl start ds4-server
     serviceConfig = {
       Type = "simple";
       User = "philipp";
