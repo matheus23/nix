@@ -122,8 +122,8 @@ struct Thresholds {
 impl Default for Thresholds {
     fn default() -> Self {
         Self {
-            warning_free_percent: 15.0,
-            critical_free_percent: 10.0,
+            warning_free_percent: 10.0,
+            critical_free_percent: 5.0,
             warning_metadata_percent: 85.0,
             critical_metadata_percent: 95.0,
             warning_combined_metadata_percent: 80.0,
@@ -694,19 +694,19 @@ GlobalReserve, single: total=536870912, used=0
     fn classifies_free_space_boundaries() {
         let thresholds = Thresholds::default();
         assert_eq!(
-            assess(&metrics(15.0, 70.0, 30, 0, 0), &thresholds).status,
+            assess(&metrics(10.0, 70.0, 30, 0, 0), &thresholds).status,
             Status::Ok
         );
         assert_eq!(
-            assess(&metrics(14.9, 70.0, 30, 0, 0), &thresholds).status,
-            Status::Warning
-        );
-        assert_eq!(
-            assess(&metrics(10.0, 70.0, 30, 0, 0), &thresholds).status,
-            Status::Warning
-        );
-        assert_eq!(
             assess(&metrics(9.9, 70.0, 30, 0, 0), &thresholds).status,
+            Status::Warning
+        );
+        assert_eq!(
+            assess(&metrics(5.0, 70.0, 30, 0, 0), &thresholds).status,
+            Status::Warning
+        );
+        assert_eq!(
+            assess(&metrics(4.9, 70.0, 30, 0, 0), &thresholds).status,
             Status::Critical
         );
     }
@@ -746,7 +746,7 @@ GlobalReserve, single: total=536870912, used=0
             Status::Critical
         );
 
-        let assessment = assess(&metrics(14.0, 70.0, 30, 0, 1), &thresholds);
+        let assessment = assess(&metrics(9.0, 70.0, 30, 0, 1), &thresholds);
         assert!(assessment.reasons.contains(&"device_errors".into()));
         assert!(assessment.reasons.contains(&"free_space".into()));
     }
