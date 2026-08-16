@@ -1,0 +1,16 @@
+[package]
+name = "btrfs-pressure-monitor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[[bin]]
+name = "btrfs-pressure-check"
+path = "src/main.rs"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = true

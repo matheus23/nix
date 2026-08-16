@@ -9,6 +9,7 @@
 
 let
   pigeons = pkgs.callPackage ../custom/pigeons/package.nix { };
+  btrfs-pressure-monitor = pkgs.callPackage ../custom/btrfs-pressure-monitor/package.nix { };
 in
 {
   imports = [
@@ -173,6 +174,7 @@ in
     socat
     bubblewrap
     pigeons
+    btrfs-pressure-monitor
   ];
 
   # needed for steam?
@@ -292,6 +294,44 @@ in
     TIMELINE_LIMIT_WEEKLY = 3;
     TIMELINE_LIMIT_MONTHLY = 3;
     TIMELINE_LIMIT_YEARLY = 0;
+  };
+
+  # Report Btrfs space and allocation pressure without taking cleanup actions.
+  systemd.services.btrfs-pressure-monitor = {
+    description = "Check Btrfs disk and allocation pressure";
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      User = "philipp";
+      Group = "users";
+      ExecStart = "${btrfs-pressure-monitor}/bin/btrfs-pressure-check";
+      TimeoutStartSec = "2m";
+      ProtectSystem = "strict";
+      ProtectHome = "read-only";
+      PrivateTmp = true;
+      NoNewPrivileges = true;
+      ProtectControlGroups = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      RestrictAddressFamilies = [ "AF_UNIX" ];
+    };
+  };
+
+  systemd.timers.btrfs-pressure-monitor = {
+    description = "Periodically check Btrfs disk and allocation pressure";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "2m";
+      OnUnitActiveSec = "10m";
+      AccuracySec = "1m";
+      Persistent = true;
+    };
+  };
+
+  # Capture pressure immediately before the existing daily snapshot cleanup.
+  systemd.services.snapper-cleanup = {
+    wants = [ "btrfs-pressure-monitor.service" ];
+    after = [ "btrfs-pressure-monitor.service" ];
   };
 
   # This value determines the NixOS release from which the default
