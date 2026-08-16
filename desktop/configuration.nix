@@ -31,6 +31,15 @@ in
     "ttm.page_pool_size=32505856"
   ];
 
+  # Keep /nix/store outside snapper's root snapshots. NixOS applies the public
+  # read-only store bind from boot.nixStoreMountOpts; the daemon keeps its private
+  # writable view.
+  fileSystems."/nix/store" = {
+    device = "/dev/disk/by-uuid/18fb10b7-1f41-4b2d-8c2a-d86825840375";
+    fsType = "btrfs";
+    options = [ "subvol=@nixstore" ];
+  };
+
   networking.hostName = "philipps-desktop"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
