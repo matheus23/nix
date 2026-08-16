@@ -93,6 +93,24 @@ in
     #media-session.enable = true;
   };
 
+  virtualisation.podman.enable = true;
+
+  virtualisation.oci-containers = {
+    backend = "podman";
+
+    containers.wbo = {
+      image = "docker.io/lovasoa/wbo:latest";
+      ports = [ "127.0.0.1:5001:80" ];
+      volumes = [
+        "/var/lib/wbo:/opt/app/server-data"
+      ];
+    };
+  };
+
+  systemd.tmpfiles.rules = [
+    "d /var/lib/wbo 0750 1000 1000 -"
+  ];
+
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
