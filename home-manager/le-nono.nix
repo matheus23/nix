@@ -33,6 +33,7 @@ let
       allow = [
         "$HOME/.letta"
         "$HOME/.cargo"
+        "$HOME/.cache/kache"
         "$HOME/.config/nono/profile-drafts"
         "/tmp"
       ];

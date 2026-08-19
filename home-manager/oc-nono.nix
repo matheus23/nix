@@ -1,5 +1,19 @@
 { pkgs, unstable }:
 
+let
+  profile = pkgs.writeText "opencode-nono-profile.json" (
+    builtins.toJSON {
+      meta = {
+        name = "opencode";
+        description = "OpenCode agent sandbox profile";
+      };
+      extends = "always-further/opencode";
+      filesystem = {
+        allow = [ "$HOME/.cache/kache" ];
+      };
+    }
+  );
+in
 pkgs.writeShellApplication {
   name = "oc-nono";
   runtimeInputs = [ unstable.nono ];
@@ -32,6 +46,6 @@ pkgs.writeShellApplication {
     exec nono run -v --read /nix --read ~/.nix-profile --read ~/.config/gh/ --allow-cwd \
       $NONO_EXTRA_FLAGS \
       ''${NONO_USER_ARGS[@]} \
-      --profile always-further/opencode opencode ''${OC_ARGS[@]}
+      --profile ${profile} opencode ''${OC_ARGS[@]}
   '';
 }

@@ -1,4 +1,9 @@
-{ pkgs, config, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 
 let
   unstable = import <nixos-unstable> { config = config.nixpkgs.config; };
@@ -13,6 +18,8 @@ let
   ];
 
   _1password = pkgs._1password-gui;
+
+  kache = pkgs.callPackage ../custom/kache/package.nix { };
 
   letta-code = pkgs.callPackage ../custom/letta-code/package.nix { };
 
@@ -30,6 +37,14 @@ in
   ];
 
   home.sessionPath = sessionPath;
+  home.sessionVariables = {
+    KACHE_CACHE_DIR = "${config.xdg.cacheHome}/kache";
+    RUSTC_WRAPPER = "${kache}/bin/kache";
+  };
+
+  home.activation.createKacheCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    $DRY_RUN_CMD mkdir -p "${config.xdg.cacheHome}/kache"
+  '';
 
   # I hoped that this fixes home.sessionPath for me under gnome
   # It doesn't.
@@ -71,6 +86,10 @@ in
 
   home.file.".ssh/allowed_signers".text = ''
     * ${signingPubKey}
+  '';
+
+  home.file.".config/git/gitignore_global".text = ''
+    .letta
   '';
 
   # we already have an ssh agent via gnome keyring
@@ -132,6 +151,7 @@ in
     pkgs.cargo-release
     pkgs.cargo-semver-checks
     unstable.cargo-outdated
+    kache
     # pkgs.cargo-public-api # outdated, need to use cargo install cargo-public-api --locked version instead
     # (import ../custom/wesnoth.nix { pkgs = pkgs; }) # is not up-to-date enough for high DPI
     pkgs.wesnoth
