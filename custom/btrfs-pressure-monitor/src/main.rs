@@ -111,7 +111,6 @@ impl Metrics {
 struct Thresholds {
     warning_free_percent: f64,
     critical_free_percent: f64,
-    warning_metadata_percent: f64,
     critical_metadata_percent: f64,
     warning_combined_metadata_percent: f64,
     warning_unallocated: u64,
@@ -124,7 +123,6 @@ impl Default for Thresholds {
         Self {
             warning_free_percent: 10.0,
             critical_free_percent: 5.0,
-            warning_metadata_percent: 85.0,
             critical_metadata_percent: 95.0,
             warning_combined_metadata_percent: 80.0,
             warning_unallocated: 24 * GIB,
@@ -294,8 +292,6 @@ fn assess(metrics: &Metrics, thresholds: &Thresholds) -> Assessment {
 
     if metrics.metadata_percent() >= thresholds.critical_metadata_percent {
         critical.push("metadata_usage");
-    } else if metrics.metadata_percent() >= thresholds.warning_metadata_percent {
-        warning.push("metadata_usage");
     }
 
     if metrics.metadata_percent() >= thresholds.critical_combined_metadata_percent
@@ -716,7 +712,11 @@ GlobalReserve, single: total=536870912, used=0
         let thresholds = Thresholds::default();
         assert_eq!(
             assess(&metrics(20.0, 85.0, 30, 0, 0), &thresholds).status,
-            Status::Warning
+            Status::Ok
+        );
+        assert_eq!(
+            assess(&metrics(20.0, 94.9, 30, 0, 0), &thresholds).status,
+            Status::Ok
         );
         assert_eq!(
             assess(&metrics(20.0, 95.0, 30, 0, 0), &thresholds).status,
