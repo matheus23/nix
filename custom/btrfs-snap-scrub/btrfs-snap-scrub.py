@@ -99,8 +99,21 @@ def logv(msg, verbose):
 # --------------------------------------------------------------------------- #
 # btrfs mount discovery
 # --------------------------------------------------------------------------- #
-def btrfs_mounts_for(dev):
-    """Return [(target, subvol_norm, subvolid_str)] for btrfs mounts on st_dev=dev."""
+def filesystem_fsid(path):
+    """Return the btrfs filesystem UUID containing path, or None."""
+    try:
+        with btrfs.FileSystem(path) as fs:
+            return fs.fsid
+    except OSError:
+        return None
+
+
+def btrfs_mounts_for(path):
+    """Return [(target, subvol_norm, subvolid_str)] for the same btrfs filesystem."""
+    fsid = filesystem_fsid(path)
+    if fsid is None:
+        return []
+
     mounts = []
     with open("/proc/mounts") as f:
         for line in f:
@@ -110,10 +123,7 @@ def btrfs_mounts_for(dev):
             _dev, target, fstype, opts = parts[0], parts[1], parts[2], parts[3]
             if fstype != "btrfs":
                 continue
-            try:
-                if os.stat(target).st_dev != dev:
-                    continue
-            except OSError:
+            if filesystem_fsid(target) != fsid:
                 continue
             subvol = None
             subvolid = None
@@ -300,9 +310,7 @@ def main(argv=None):
 
     is_dir = os.path.isdir(target) and not os.path.islink(target)
     inum = os.stat(target, follow_symlinks=False).st_ino
-    dev = os.stat(target).st_dev
-
-    mounts = btrfs_mounts_for(dev)
+    mounts = btrfs_mounts_for(target)
     if not mounts:
         die("could not find a btrfs mount for %s" % target)
     live_mount = mount_of_path(target, mounts)

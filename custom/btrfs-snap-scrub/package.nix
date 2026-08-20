@@ -11,7 +11,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "btrfs-snap-scrub";
-  version = "0.1.0";
+  version = "0.1.1";
 
   src = ./btrfs-snap-scrub.py;
 
@@ -21,11 +21,25 @@ stdenv.mkDerivation {
   dontBuild = true;
   dontConfigure = true;
 
+  nativeCheckInputs = [ pythonEnv ];
+  doCheck = true;
+
+  checkPhase = ''
+    runHook preCheck
+    python ${./test_mount_discovery.py} $src
+    runHook postCheck
+  '';
+
   installPhase = ''
     runHook preInstall
     install -Dm555 $src $out/bin/btrfs-snap-scrub
     wrapProgram $out/bin/btrfs-snap-scrub \
-      --prefix PATH : ${lib.makeBinPath [ pythonEnv btrfs-progs ]}
+      --prefix PATH : ${
+        lib.makeBinPath [
+          pythonEnv
+          btrfs-progs
+        ]
+      }
     runHook postInstall
   '';
 
