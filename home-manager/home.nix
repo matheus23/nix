@@ -39,8 +39,15 @@ in
   home.sessionPath = sessionPath;
   home.sessionVariables = {
     KACHE_CACHE_DIR = "${config.xdg.cacheHome}/kache";
-    RUSTC_WRAPPER = "${kache}/bin/kache";
   };
+
+  # Long-lived desktop sessions can skip newly added Home Manager variables when they inherit the
+  # session-variable sourcing guard. Cargo's own config applies the wrapper independently of that
+  # environment, including to builds launched by IDEs and sandboxed agents.
+  home.file.".cargo/config.toml".text = ''
+    [build]
+    rustc-wrapper = "${kache}/bin/kache"
+  '';
 
   home.activation.createKacheCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     $DRY_RUN_CMD mkdir -p "${config.xdg.cacheHome}/kache"
