@@ -213,6 +213,8 @@ in
 
     pkgs.libnotify # for notify-send utility
 
+    pkgs.ripgrep
+
     # "uninstalled" section
 
     # pkgs.brave
