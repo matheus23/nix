@@ -168,7 +168,7 @@
           '';
 
           command_menu = command-utils.commands.${system} {
-            db-start = cmd "Start the postgres database" ''${pgctl} -o "-k /tmp" -D "$PGDATA" -l "$PWD/.data/postgres.log" start'';
+            db-start = cmd "Start the postgres database" ''${pgctl} -o "-k /tmp -c max_connections=300" -D "$PGDATA" -l "$PWD/.data/postgres.log" start'';
             db-stop = cmd "Stop the postgres database" ''${pgctl} -o "-k /tmp" -D "$PGDATA" stop'';
             db-reset = cmd "Reset the postgres database" "db-stop && db-start && cargo sqlx database reset --source=backend/migrations";
             test-services-up = cmd "Start Stripe, SES, and Greenmail test services" ''
@@ -243,7 +243,7 @@
               echo -e "\nInitializing PostgreSQL in $PGDATA\n"
               mkdir -p "$(dirname "$PGDATA")"
               initdb "$PGDATA" --no-instructions -A trust -U philipp
-              if pg_ctl -o '-k /tmp' -D "$PGDATA" -l "$PWD/.data/postgres.log" start; then
+              if pg_ctl -o '-k /tmp -c max_connections=300' -D "$PGDATA" -l "$PWD/.data/postgres.log" start; then
                 createdb iroh_services
                 pg_ctl -o '-k /tmp' -D "$PGDATA" stop
               else
