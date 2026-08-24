@@ -140,10 +140,59 @@
 
           pw-drivers = unstable.playwright-driver.browsers;
 
+          test-compose = pkgs.writeText "svc-test-compose.yml" ''
+            name: svc-test
+
+            services:
+              stripe-mock:
+                image: stripe/stripe-mock:latest@sha256:24f145e3dfffda8b55c09ca3babf5dcd117e49138a93590c7dd617f03be41117
+                ports:
+                  - "127.0.0.1:12111:12111"
+                restart: unless-stopped
+
+              ses:
+                image: dasprid/aws-ses-v2-local@sha256:051c11414ff3be674d3218db0e9539ca2e42a4e5f0efb65133064fe5d54fa7e4
+                ports:
+                  - "127.0.0.1:8005:8005"
+                restart: unless-stopped
+
+              greenmail:
+                image: greenmail/standalone:2.1.2@sha256:572d22796908375678119a13fabfcdc5416c9003404ab975fe824692fe02ba03
+                ports:
+                  - "127.0.0.1:3025:3025"
+                  - "127.0.0.1:3143:3143"
+                environment:
+                  GREENMAIL_OPTS: -Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.verbose
+                  JAVA_OPTS: -Djava.net.preferIPv4Stack=true -Xmx256m
+                restart: unless-stopped
+          '';
+
           command_menu = command-utils.commands.${system} {
-            db-start = cmd "Start the postgres database" ''${pgctl} -o "-k /tmp" -D "./.pg" -l postgres.log start'';
-            db-stop = cmd "Stop the postgres database" ''${pgctl} -o "-k /tmp" -D "./.pg" stop'';
-            db-reset = cmd "Reset the postgres database" ''db-stop && db-start && cargo sqlx database reset --source=ips/backend/migrations'';
+            db-start = cmd "Start the postgres database" ''${pgctl} -o "-k /tmp" -D "$PGDATA" -l "$PWD/.data/postgres.log" start'';
+            db-stop = cmd "Stop the postgres database" ''${pgctl} -o "-k /tmp" -D "$PGDATA" stop'';
+            db-reset = cmd "Reset the postgres database" "db-stop && db-start && cargo sqlx database reset --source=backend/migrations";
+            test-services-up = cmd "Start Stripe, SES, and Greenmail test services" ''
+              set -e
+              docker compose -f ${test-compose} up -d
+              for service in stripe-mock:12111 ses:8005 greenmail-smtp:3025 greenmail-imap:3143; do
+                name="''${service%:*}"
+                port="''${service#*:}"
+                for attempt in $(seq 1 30); do
+                  if nc -z 127.0.0.1 "$port" 2>/dev/null; then
+                    echo "$name is ready on 127.0.0.1:$port"
+                    break
+                  fi
+                  if [ "$attempt" -eq 30 ]; then
+                    echo "$name did not become ready on 127.0.0.1:$port" >&2
+                    docker compose -f ${test-compose} logs
+                    exit 1
+                  fi
+                  sleep 1
+                done
+              done
+            '';
+            test-services-down = cmd "Stop Stripe, SES, and Greenmail test services" ''docker compose -f ${test-compose} down'';
+            svc-test = cmd "Run svc workspace tests with local service dependencies" ''test-services-up && cargo nextest run --workspace --no-fail-fast'';
           };
         in
         pkgs.mkShell {
@@ -154,51 +203,59 @@
             direnv
             command_menu
             sqlx-cli
+            netcat
             pkg-config
             openssl
             pw-drivers # for e2e playwright tests. **Needs to be same the same version as playwright npm package**
             bashInteractive # In an effort to fix the terminal in NixOS: (https://www.reddit.com/r/NixOS/comments/ycde3d/vscode_terminal_not_working_properly/)
             stripe-cli
+          ] ++ [
+            unstable.docker-client
+            unstable.docker-compose
           ];
 
-          # TODO: These paths are all still relative. Should fix that
           shellHook = ''
             # For e2e playwright tests
             export PLAYWRIGHT_BROWSERS_PATH=${pw-drivers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
 
+            # Use the desktop's rootless Podman service through its Docker-compatible API.
+            export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+
+            # Keep local application and npm state inside svc's ignored .data directory.
+            export XDG_DATA_HOME="$PWD/.data"
+            export NPM_CONFIG_CACHE="$PWD/.data/npm-cache"
+            mkdir -p "$XDG_DATA_HOME" "$NPM_CONFIG_CACHE"
+
             # postgres
-            export PGDATA="./.pg";
-            export PGURL=postgres://philipp@localhost:5432/n0des
+            export PGDATA="$PWD/.data/postgres"
+            export PGURL=postgres://philipp@127.0.0.1:5432/iroh_services
 
             # Setup env variables for easier sqlx CLI usage:
             export DATABASE_URL="$PGURL"
+            export SQLX_OFFLINE=true
 
             # make pgcli use /tmp as unix domain socket, otherwise it'll try /run/postgresql, which doesn't work
             export PGHOST="/tmp"
 
             # Initialize a local database if necessary.
-            if [ ! -e $PGDATA ]; then
+            if [ ! -e "$PGDATA/PG_VERSION" ]; then
               echo -e "\nInitializing PostgreSQL in $PGDATA\n"
-              initdb $PGDATA --no-instructions -A trust -U philipp
-              if pg_ctl -o '-k /tmp' -D $PGDATA start; then
-                createdb n0des
-                cargo sqlx mig run --source=ips/backend/migrations
-                pg_ctl -o '-k /tmp' -D $PGDATA stop
+              mkdir -p "$(dirname "$PGDATA")"
+              initdb "$PGDATA" --no-instructions -A trust -U philipp
+              if pg_ctl -o '-k /tmp' -D "$PGDATA" -l "$PWD/.data/postgres.log" start; then
+                createdb iroh_services
+                pg_ctl -o '-k /tmp' -D "$PGDATA" stop
               else
                 echo "Unable to start PostgreSQL server on default port (:5432). Maybe a local database is already running?"
               fi
             fi
 
-            if [ ! -e $PGDATA/postmaster.pid ]; then
+            if ! pg_ctl -D "$PGDATA" status > /dev/null 2>&1; then
               echo -e "\nPostgreSQL not running."
               echo
             else
               echo -e "\nPostgreSQL is running."
-
-              echo -e "\nRunning pending sqlx migrations..."
-              cargo sqlx mig run --source=ips/backend/migrations
-              echo
             fi
 
             menu
