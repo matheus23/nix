@@ -307,6 +307,9 @@ in
       Group = "users";
       ExecStart = "${btrfs-pressure-monitor}/bin/btrfs-pressure-check";
       TimeoutStartSec = "2m";
+      StateDirectory = "btrfs-pressure-monitor";
+      StateDirectoryMode = "0700";
+      UMask = "0077";
       ProtectSystem = "strict";
       ProtectHome = "read-only";
       PrivateTmp = true;

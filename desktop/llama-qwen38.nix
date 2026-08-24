@@ -116,7 +116,7 @@ in
         "--batch-size"
         "512"
         "--ubatch-size"
-        "512"
+        "256"
         "--flash-attn"
         "on"
         "--cache-type-k"

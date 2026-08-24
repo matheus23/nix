@@ -3,14 +3,16 @@ use std::{
     env,
     fmt::{self, Write as _},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const GIB: u64 = 1024 * 1024 * 1024;
 const MOUNT: &str = "/";
+const WARNING_BACKOFF_SECONDS: [u64; 5] =
+    [60 * 60, 2 * 60 * 60, 4 * 60 * 60, 8 * 60 * 60, 24 * 60 * 60];
 
 fn main() {
     if let Err(error) = run() {
@@ -39,10 +41,8 @@ fn run() -> Result<(), String> {
     let summary = summary(assessment.status, &assessment.reasons, metrics.as_ref());
     println!("{summary}");
 
-    if !no_notify && assessment.status.is_pressure() {
-        let (title, body) =
-            notification_text(assessment.status, &assessment.reasons, metrics.as_ref());
-        send_notification(assessment.status, &title, &body);
+    if !no_notify {
+        handle_notification(&assessment, metrics.as_ref());
     }
     Ok(())
 }
@@ -61,10 +61,6 @@ impl Status {
             Self::Warning => "warning",
             Self::Critical => "critical",
         }
-    }
-
-    fn is_pressure(self) -> bool {
-        matches!(self, Self::Warning | Self::Critical)
     }
 }
 
@@ -143,6 +139,199 @@ impl Assessment {
         Self {
             status,
             reasons: reasons.into_iter().map(str::to_owned).collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct WarningBackoffState {
+    fingerprint: String,
+    last_notified: u64,
+    notifications: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum WarningNotificationDecision {
+    Notify(WarningBackoffState),
+    Suppress { remaining_seconds: u64 },
+}
+
+fn handle_notification(assessment: &Assessment, metrics: Option<&Metrics>) {
+    let state_path = warning_state_path();
+    match assessment.status {
+        Status::Ok => clear_warning_state(state_path.as_deref()),
+        Status::Critical => {
+            clear_warning_state(state_path.as_deref());
+            let (title, body) = notification_text(assessment.status, &assessment.reasons, metrics);
+            send_notification(assessment.status, &title, &body);
+        }
+        Status::Warning => {
+            send_warning_with_backoff(state_path.as_deref(), assessment, metrics);
+        }
+    }
+}
+
+fn send_warning_with_backoff(
+    state_path: Option<&Path>,
+    assessment: &Assessment,
+    metrics: Option<&Metrics>,
+) {
+    let Some(state_path) = state_path else {
+        eprintln!("notification_backoff=disabled error=state_directory_unavailable");
+        let (title, body) = notification_text(assessment.status, &assessment.reasons, metrics);
+        send_notification(assessment.status, &title, &body);
+        return;
+    };
+    let now = match unix_timestamp() {
+        Ok(now) => now,
+        Err(error) => {
+            eprintln!("notification_backoff=disabled error={}", one_line(&error));
+            let (title, body) = notification_text(assessment.status, &assessment.reasons, metrics);
+            send_notification(assessment.status, &title, &body);
+            return;
+        }
+    };
+    let previous = match load_warning_state(state_path) {
+        Ok(state) => state,
+        Err(error) => {
+            eprintln!("notification_backoff=reset error={}", one_line(&error));
+            None
+        }
+    };
+    let fingerprint = assessment.reasons.join(",");
+    match warning_notification_decision(previous.as_ref(), &fingerprint, now) {
+        WarningNotificationDecision::Suppress { remaining_seconds } => {
+            eprintln!("notification=suppressed backoff_remaining_seconds={remaining_seconds}");
+        }
+        WarningNotificationDecision::Notify(next_state) => {
+            let (title, body) = notification_text(assessment.status, &assessment.reasons, metrics);
+            if send_notification(assessment.status, &title, &body) {
+                match save_warning_state(state_path, &next_state) {
+                    Ok(()) => {}
+                    Err(error) => {
+                        eprintln!("notification_backoff=unsaved error={}", one_line(&error));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn warning_notification_decision(
+    previous: Option<&WarningBackoffState>,
+    fingerprint: &str,
+    now: u64,
+) -> WarningNotificationDecision {
+    let Some(previous) = previous.filter(|state| state.fingerprint == fingerprint) else {
+        return WarningNotificationDecision::Notify(WarningBackoffState {
+            fingerprint: fingerprint.to_owned(),
+            last_notified: now,
+            notifications: 1,
+        });
+    };
+    let delay_index = previous.notifications.saturating_sub(1) as usize;
+    let delay = WARNING_BACKOFF_SECONDS[delay_index.min(WARNING_BACKOFF_SECONDS.len() - 1)];
+    let Some(elapsed) = now.checked_sub(previous.last_notified) else {
+        return WarningNotificationDecision::Notify(WarningBackoffState {
+            fingerprint: fingerprint.to_owned(),
+            last_notified: now,
+            notifications: previous.notifications.saturating_add(1),
+        });
+    };
+    if elapsed < delay {
+        return WarningNotificationDecision::Suppress {
+            remaining_seconds: delay - elapsed,
+        };
+    }
+    WarningNotificationDecision::Notify(WarningBackoffState {
+        fingerprint: fingerprint.to_owned(),
+        last_notified: now,
+        notifications: previous.notifications.saturating_add(1),
+    })
+}
+
+fn warning_state_path() -> Option<PathBuf> {
+    env::var_os("STATE_DIRECTORY")
+        .and_then(|directories| env::split_paths(&directories).next())
+        .map(|directory| directory.join("warning-backoff"))
+}
+
+fn unix_timestamp() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|error| format!("reading system time: {error}"))
+}
+
+fn load_warning_state(path: &Path) -> Result<Option<WarningBackoffState>, String> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("reading {}: {error}", path.display())),
+    };
+    parse_warning_state(&text).map(Some)
+}
+
+fn parse_warning_state(text: &str) -> Result<WarningBackoffState, String> {
+    let mut lines = text.lines();
+    if lines.next() != Some("version=1") {
+        return Err("unsupported warning backoff state version".into());
+    }
+    let notifications = state_value(lines.next(), "notifications=")?
+        .parse::<u32>()
+        .map_err(|_| "invalid warning backoff notification count")?;
+    if notifications == 0 {
+        return Err("invalid zero warning backoff notification count".into());
+    }
+    let last_notified = state_value(lines.next(), "last_notified=")?
+        .parse::<u64>()
+        .map_err(|_| "invalid warning backoff timestamp")?;
+    let fingerprint = state_value(lines.next(), "fingerprint=")?;
+    if fingerprint.is_empty() {
+        return Err("empty warning backoff fingerprint".into());
+    }
+    if lines.any(|line| !line.is_empty()) {
+        return Err("unexpected warning backoff state fields".into());
+    }
+    Ok(WarningBackoffState {
+        fingerprint: fingerprint.to_owned(),
+        last_notified,
+        notifications,
+    })
+}
+
+fn state_value<'a>(line: Option<&'a str>, prefix: &str) -> Result<&'a str, String> {
+    line.and_then(|line| line.strip_prefix(prefix))
+        .ok_or_else(|| format!("missing warning backoff field {prefix:?}"))
+}
+
+fn save_warning_state(path: &Path, state: &WarningBackoffState) -> Result<(), String> {
+    let text = format!(
+        "version=1\nnotifications={}\nlast_notified={}\nfingerprint={}\n",
+        state.notifications, state.last_notified, state.fingerprint
+    );
+    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
+    fs::write(&temporary, text)
+        .map_err(|error| format!("writing {}: {error}", temporary.display()))?;
+    if let Err(error) = fs::rename(&temporary, path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(format!("replacing {}: {error}", path.display()));
+    }
+    Ok(())
+}
+
+fn clear_warning_state(path: Option<&Path>) {
+    let Some(path) = path else {
+        return;
+    };
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            eprintln!(
+                "notification_backoff=uncleared error={}",
+                one_line(&error.to_string())
+            );
         }
     }
 }
@@ -648,6 +837,13 @@ GlobalReserve, single: total=536870912, used=0
         }
     }
 
+    fn notified(decision: WarningNotificationDecision) -> WarningBackoffState {
+        match decision {
+            WarningNotificationDecision::Notify(state) => state,
+            WarningNotificationDecision::Suppress { .. } => panic!("expected notification"),
+        }
+    }
+
     #[test]
     fn parses_current_usage() {
         let parsed = parse_filesystem_usage(USAGE).unwrap();
@@ -749,6 +945,81 @@ GlobalReserve, single: total=536870912, used=0
         let assessment = assess(&metrics(9.0, 70.0, 30, 0, 1), &thresholds);
         assert!(assessment.reasons.contains(&"device_errors".into()));
         assert!(assessment.reasons.contains(&"free_space".into()));
+    }
+
+    #[test]
+    fn warning_backoff_reaches_daily_cap() {
+        let fingerprint = "metadata_allocation";
+        let mut now = 100;
+        let mut state = notified(warning_notification_decision(None, fingerprint, now));
+        assert_eq!(state.notifications, 1);
+
+        for delay in WARNING_BACKOFF_SECONDS {
+            assert_eq!(
+                warning_notification_decision(Some(&state), fingerprint, now + delay - 1),
+                WarningNotificationDecision::Suppress {
+                    remaining_seconds: 1
+                }
+            );
+            now += delay;
+            state = notified(warning_notification_decision(
+                Some(&state),
+                fingerprint,
+                now,
+            ));
+        }
+
+        assert_eq!(state.notifications, 6);
+        assert!(matches!(
+            warning_notification_decision(Some(&state), fingerprint, now + 24 * 60 * 60 - 1),
+            WarningNotificationDecision::Suppress { .. }
+        ));
+        let state = notified(warning_notification_decision(
+            Some(&state),
+            fingerprint,
+            now + 24 * 60 * 60,
+        ));
+        assert_eq!(state.notifications, 7);
+    }
+
+    #[test]
+    fn changed_warning_notifies_immediately() {
+        let previous = WarningBackoffState {
+            fingerprint: "free_space".into(),
+            last_notified: 100,
+            notifications: 5,
+        };
+        let state = notified(warning_notification_decision(
+            Some(&previous),
+            "metadata_allocation",
+            101,
+        ));
+        assert_eq!(
+            state,
+            WarningBackoffState {
+                fingerprint: "metadata_allocation".into(),
+                last_notified: 101,
+                notifications: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn warning_state_round_trips_and_clears() {
+        let path = env::temp_dir().join(format!(
+            "btrfs-pressure-warning-state-{}",
+            std::process::id()
+        ));
+        let state = WarningBackoffState {
+            fingerprint: "free_space,metadata_allocation".into(),
+            last_notified: 1234,
+            notifications: 4,
+        };
+
+        save_warning_state(&path, &state).unwrap();
+        assert_eq!(load_warning_state(&path).unwrap(), Some(state));
+        clear_warning_state(Some(&path));
+        assert_eq!(load_warning_state(&path).unwrap(), None);
     }
 
     #[test]
