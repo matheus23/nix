@@ -81,8 +81,8 @@ pkgs.writeShellApplication {
     # This directory contains the dedicated key and tunnel config for the
     # isolated laptop agent, not the user's normal SSH credentials.
     exec nono run -v --read /nix --read ~/.nix-profile --read ~/.config/gh/ --allow-cwd \
-      ''${NONO_EXTRA_FLAGS[@]} \
-      ''${NONO_USER_ARGS[@]} \
-      --profile ${profile} ${letta-code}/bin/letta ''${LETTA_ARGS[@]}
+      "''${NONO_EXTRA_FLAGS[@]}" \
+      "''${NONO_USER_ARGS[@]}" \
+      --profile ${profile} ${letta-code}/bin/letta "''${LETTA_ARGS[@]}"
   '';
 }
