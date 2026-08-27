@@ -52,23 +52,25 @@ pkgs.writeShellApplication {
   name = "le-nono";
   runtimeInputs = [ unstable.nono ];
   text = ''
-    NONO_EXTRA_FLAGS=""
+    NONO_EXTRA_FLAGS=()
 
     GIT_DIR="$(git rev-parse --git-dir 2>/dev/null)" || true
     if [[ -n "$GIT_DIR" ]] && echo "$GIT_DIR" | grep -q '/worktrees/'; then
       WORKTREE_NAME="$(basename "$GIT_DIR")"
       MAIN_GIT="$(dirname "$(dirname "$GIT_DIR")")"
 
-      NONO_EXTRA_FLAGS="--read $MAIN_GIT --allow $MAIN_GIT/worktrees/$WORKTREE_NAME"
+      NONO_EXTRA_FLAGS=(--read "$MAIN_GIT" --allow "$MAIN_GIT/worktrees/$WORKTREE_NAME")
     fi
 
-    # Split args: everything before -- goes to nono, after -- goes to letta
+    # Split args: everything before -- goes to nono, after -- goes to letta.
     NONO_USER_ARGS=()
     LETTA_ARGS=()
     SPLIT=false
     for arg in "$@"; do
       if [[ "$arg" == "--" ]]; then
         SPLIT=true
+      elif ! $SPLIT && [[ "$arg" == "--access-laptop" ]]; then
+        NONO_EXTRA_FLAGS+=(--allow "$HOME/.config/letta/ssh")
       elif $SPLIT; then
         LETTA_ARGS+=("$arg")
       else
@@ -76,9 +78,10 @@ pkgs.writeShellApplication {
       fi
     done
 
-    # shellcheck disable=SC2086,SC2068
+    # This directory contains the dedicated key and tunnel config for the
+    # isolated laptop agent, not the user's normal SSH credentials.
     exec nono run -v --read /nix --read ~/.nix-profile --read ~/.config/gh/ --allow-cwd \
-      $NONO_EXTRA_FLAGS \
+      ''${NONO_EXTRA_FLAGS[@]} \
       ''${NONO_USER_ARGS[@]} \
       --profile ${profile} ${letta-code}/bin/letta ''${LETTA_ARGS[@]}
   '';

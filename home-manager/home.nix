@@ -23,6 +23,8 @@ let
 
   letta-code = pkgs.callPackage ../custom/letta-code/package.nix { };
 
+  pigeons = pkgs.callPackage ../custom/pigeons/package.nix { };
+
 in
 {
   home.username = "philipp";
@@ -200,6 +202,17 @@ in
     unstable.opencode
     unstable.nono # sandbox for agents
     (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
+
+    (pkgs.writeShellApplication {
+      name = "ssh-laptop";
+      runtimeInputs = [
+        pkgs.openssh
+        pigeons
+      ];
+      text = ''
+        exec ssh -F "$HOME/.config/letta/ssh/config" laptop-agent "$@"
+      '';
+    })
 
     # I really really hate aws-lc-rs. But I guess I need to install these now
     pkgs.cmake

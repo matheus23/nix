@@ -159,6 +159,18 @@ in
     ];
   };
 
+  # Dedicated system user for the agent container's pigeons roost.
+  # Runs separately from the main pigeons service so it gets its own
+  # endpoint identity, delivering to the container's sshd on port 2222.
+  # Get the endpoint ID with: journalctl -u pigeons-agent -b | grep "id:"
+  users.users.pigeons-agent = {
+    isSystemUser = true;
+    group = "pigeons-agent";
+    home = "/var/lib/pigeons-agent";
+    createHome = true;
+  };
+  users.groups.pigeons-agent = { };
+
   # Home manager
   home-manager.useGlobalPkgs = true;
   home-manager.users.philipp = import /home/philipp/program/nix/home/home-manager/home.nix;
@@ -287,6 +299,26 @@ in
     };
   };
 
+  # Second pigeons roost for the agent container. Delivers incoming pigeons
+  # to the agent-box container's sshd on port 2222 (localhost only).
+  # Runs as a separate user so it gets a distinct endpoint identity from
+  # the main roost. Tail logs: journalctl -u pigeons-agent -f
+  systemd.services.pigeons-agent = {
+    description = "pigeons roost — agent container tunnel";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      Environment = "RUST_LOG=info";
+      ExecStart = "${pigeons}/bin/pigeons roost --ssh-port 2222";
+      Restart = "on-failure";
+      RestartSec = 3;
+      User = "pigeons-agent";
+      Group = "pigeons-agent";
+    };
+  };
+
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
@@ -296,6 +328,49 @@ in
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+
+  # Declarative container for the sandboxed agent. Shares the host network
+  # (privateNetwork = false) so the pigeons-agent roost can reach it on
+  # 127.0.0.1:2222. The agent SSHes in as the `agent` user and gets a
+  # fully isolated filesystem — no access to the host's /home or /etc.
+  containers.agent-box = {
+    autoStart = true;
+    privateNetwork = false;
+    config =
+      { config, pkgs, ... }:
+      {
+        services.openssh = {
+          enable = true;
+          settings.PasswordAuthentication = false;
+          settings.PermitRootLogin = "no";
+          listenAddresses = [
+            {
+              addr = "127.0.0.1";
+              port = 2222;
+            }
+          ];
+        };
+
+        users.users.agent = {
+          isNormalUser = true;
+          shell = pkgs.bashInteractive;
+          openssh.authorizedKeys.keys = [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF3d6FTFTHA4TteYiXhZd9qm95nvkjPIi+RCrEB1nMUT oc-agent@desktop"
+          ];
+        };
+
+        environment.systemPackages = with pkgs; [
+          git
+          curl
+          wget
+        ];
+
+        nix.settings.experimental-features = "nix-command flakes";
+        nixpkgs.config.allowUnfree = true;
+
+        system.stateVersion = "25.05";
+      };
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
