@@ -1,0 +1,96 @@
+diff --git a/src/llama-mmap.cpp b/src/llama-mmap.cpp
+index ed572da7..931d574a 100644
+--- a/src/llama-mmap.cpp
++++ b/src/llama-mmap.cpp
+@@ -523,6 +523,16 @@ struct llama_mmap::impl {
+         mapped_fragments = std::move(new_mapped_fragments);
+     }
+ 
++    void advise_random(size_t first, size_t last) {
++        const size_t page_size = sysconf(_SC_PAGESIZE);
++        first &= ~(page_size - 1);
++        last = std::min(size, (last + page_size - 1) & ~(page_size - 1));
++        if (last > first && posix_madvise((uint8_t *) addr + first, last - first, POSIX_MADV_RANDOM)) {
++            LLAMA_LOG_WARN("warning: posix_madvise(.., POSIX_MADV_RANDOM) failed: %s\n",
++                    strerror(errno));
++        }
++    }
++
+     ~impl() {
+         for (const auto & frag : mapped_fragments) {
+             if (munmap((char *) addr + frag.first, frag.second - frag.first)) {
+@@ -582,6 +592,11 @@ struct llama_mmap::impl {
+         GGML_UNUSED(last);
+     }
+ 
++    void advise_random(size_t first, size_t last) {
++        GGML_UNUSED(first);
++        GGML_UNUSED(last);
++    }
++
+     ~impl() {
+         if (hMapping) {
+             if (addr) {
+@@ -611,6 +626,13 @@ struct llama_mmap::impl {
+ 
+         throw std::runtime_error("mmap not supported");
+     }
++
++    void advise_random(size_t first, size_t last) {
++        GGML_UNUSED(first);
++        GGML_UNUSED(last);
++
++        throw std::runtime_error("mmap not supported");
++    }
+ #endif
+ 
+     void * addr;
+@@ -624,6 +646,7 @@ size_t llama_mmap::size() const { return pimpl->size; }
+ void * llama_mmap::addr() const { return pimpl->addr; }
+ 
+ void llama_mmap::unmap_fragment(size_t first, size_t last) { pimpl->unmap_fragment(first, last); }
++void llama_mmap::advise_random(size_t first, size_t last) { pimpl->advise_random(first, last); }
+ 
+ #if defined(_POSIX_MEMLOCK_RANGE) || defined(_WIN32)
+ const bool llama_mmap::SUPPORTED  = true;
+diff --git a/src/llama-mmap.h b/src/llama-mmap.h
+index b7d5c61e..36e0d7b9 100644
+--- a/src/llama-mmap.h
++++ b/src/llama-mmap.h
+@@ -49,6 +49,7 @@ struct llama_mmap {
+     void * addr() const;
+ 
+     void unmap_fragment(size_t first, size_t last);
++    void advise_random(size_t first, size_t last);
+ 
+     static const bool SUPPORTED;
+ 
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+index 5071556a..e4787971 100644
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@ -1351,6 +1351,11 @@ void llama_model_loader::done_getting_tensors(bool partial) const {
+ }
+ 
+ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps) {
++    const auto sparse_embedding = weights_map.find("per_layer_token_embd.weight");
++    if (sparse_embedding != weights_map.end()) {
++        prefetch = false;
++    }
++
+     if (use_mmap) {
+         mappings.reserve(files.size());
+         mmaps_used.reserve(files.size());
+@@ -1375,6 +1380,12 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
+             }
+             mappings.emplace_back(std::move(mapping));
+         }
++
++        if (sparse_embedding != weights_map.end()) {
++            const auto & weight = sparse_embedding->second;
++            mappings.at(weight.idx)->advise_random(
++                weight.offs, weight.offs + ggml_nbytes(weight.tensor));
++        }
+     }
+ 
+     // compute the total size of all tensors for progress reporting

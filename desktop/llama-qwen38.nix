@@ -5,21 +5,25 @@
 }:
 
 let
-  llamaCppDFlash2 =
+  llamaCppQwen4Exp =
     (pkgs.llama-cpp.override {
       vulkanSupport = true;
       rocmSupport = false;
       blasSupport = false;
     }).overrideAttrs
       (old: {
-        version = "0-unstable-2026-08-18";
+        version = "0-unstable-2026-08-27-qwen4exp";
         src = pkgs.fetchzip {
-          url = "https://github.com/z-lab/llama.cpp-fork/archive/5ecbe1ac17ec0484c5b44af0bd580cdc9c428ed4.tar.gz";
-          hash = "sha256-KUNt0vXCCVBxoljNTrFZ2pL8opheI1ySPoRmBrChGfg=";
+          url = "https://github.com/unslothai/llama.cpp/archive/6c5afc86ae84448ae4d744e357017e2c490ad9c3.tar.gz";
+          hash = "sha256-6qMeFRuSn/5CEU/AN6sArXJzQfC4rhSlPXuHGHmMGwU=";
         };
+        # Avoid prefaulting the full model alongside its Vulkan copy, and mark
+        # the host-side PLE range as random-access. Remove this when upstream
+        # issue #27766 gains equivalent per-tensor mmap policy.
+        patches = (old.patches or [ ]) ++ [ ./llama-qwen38-random-ple.patch ];
         buildInputs = old.buildInputs ++ [ pkgs.spirv-headers ];
         preConfigure = ''
-          printf '%s\n' 5ecbe1ac17ec0484c5b44af0bd580cdc9c428ed4 > COMMIT
+          printf '%s\n' 6c5afc86ae84448ae4d744e357017e2c490ad9c3 > COMMIT
         ''
         + old.preConfigure;
         cmakeFlags =
@@ -31,13 +35,12 @@ let
           ];
       });
 
-  targetDir = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-27B-GGUF/990216cf312573f2ac4060279848e0f4237600c7";
-  target = "${targetDir}/Qwen3.8-27B-UD-Q8_K_XL.gguf";
-  draftDir = "/home/philipp/.local/share/models/huggingface/incoai/Qwen3.8-27B-DFlash2-GGUF/6cb5872e2cee6b4e780a8414922350be8e42d65c";
-  draft = "${draftDir}/Qwen3.8-27B-DFlash2-Q4_K_M.gguf";
+  modelDir = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932";
+  target = "${modelDir}/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
+  mmproj = "${modelDir}/mmproj-F16.gguf";
 
   downloadModels = pkgs.writeShellApplication {
-    name = "download-qwen38-llama-models";
+    name = "download-qwen38-flash-next-model";
     runtimeInputs = with pkgs; [
       aria2
       coreutils
@@ -61,24 +64,19 @@ in
 {
   environment.systemPackages = [
     downloadModels
-    llamaCppDFlash2
+    llamaCppQwen4Exp
   ];
 
-  # The Q4 draft only proposes candidates. Q8 target verification and residual
-  # sampling preserve the target distribution; draft quantization affects
-  # acceptance and speed rather than the intended output quality.
+  # Qwen3.8-Flash-Next is the experimental Qwen4 architecture. Its native MTP
+  # head is not supported by llama.cpp yet, so this service deliberately uses
+  # target-only decoding until that path has a correctness-tested implementation.
   systemd.services.llama-qwen38 = {
-    description = "Qwen3.8 27B Q8-XL with DFlash2 speculative decoding";
+    description = "Qwen3.8 Flash Next Q4-XL (experimental Qwen4 architecture)";
     conflicts = [
       "ds4-server.service"
-      "vllm-qwen38.service"
-      "vllm-qwen38-vision.service"
     ];
     wantedBy = [ ];
-    unitConfig.ConditionPathExists = [
-      "${targetDir}/.verified"
-      "${draftDir}/.verified"
-    ];
+    unitConfig.ConditionPathExists = [ "${modelDir}/.verified" ];
     serviceConfig = {
       Type = "simple";
       User = "philipp";
@@ -94,23 +92,25 @@ in
       ];
       ExecStartPre = "+${enterPerformanceProfile}";
       ExecStart = lib.escapeShellArgs [
-        "${llamaCppDFlash2}/bin/llama-server"
+        "${llamaCppQwen4Exp}/bin/llama-server"
         "--model"
         target
+        "--mmproj"
+        mmproj
         "--alias"
-        "qwen3.8-27b-q8"
+        "qwen3.8-flash-next-q4"
         "--host"
         "127.0.0.1"
         "--port"
         "8422"
         "--ctx-size"
-        "524288"
+        "262144"
         "--fit"
         "off"
         "--n-gpu-layers"
         "999999"
         "--parallel"
-        "2"
+        "3"
         "--threads"
         "12"
         "--batch-size"
@@ -123,31 +123,28 @@ in
         "f16"
         "--cache-type-v"
         "f16"
-        "--kv-unified"
+        # The 51B n-gram embedding is a sparse lookup table. Keep it host-side
+        # and mmap-backed instead of spending most of unified memory on it.
+        "--override-tensor"
+        "per_layer_token_embd=CPU"
         "--load-mode"
-        "none"
+        "mmap"
         "--jinja"
         "--reasoning-preserve"
         "--temp"
-        "0"
+        "1.0"
+        "--top-p"
+        "0.95"
+        "--top-k"
+        "20"
+        "--min-p"
+        "0.0"
         "--metrics"
-        "--spec-type"
-        "draft-dflash"
-        "--spec-draft-model"
-        draft
-        "--spec-draft-ngl"
-        "999999"
-        "--spec-draft-type-k"
-        "f16"
-        "--spec-draft-type-v"
-        "f16"
-        "--spec-draft-n-max"
-        "7"
       ];
       ExecStopPost = "+${restorePowerProfile}";
       Restart = "on-failure";
       RestartSec = 30;
-      TimeoutStartSec = 600;
+      TimeoutStartSec = 1800;
       TimeoutStopSec = 120;
       LimitMEMLOCK = "infinity";
       LimitNOFILE = 1048576;
