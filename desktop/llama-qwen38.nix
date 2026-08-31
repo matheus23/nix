@@ -38,6 +38,17 @@ let
   modelDir = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932";
   target = "${modelDir}/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
   mmproj = "${modelDir}/mmproj-F16.gguf";
+  llama32Target = "/home/philipp/.lmstudio/models/unsloth/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf";
+
+  # Keep the UI separate from the llama-server binary so the server build does
+  # not need npm. The fixed-output hash pins the prebuilt assets from the
+  # llama.cpp UI bucket.
+  llamaUi = pkgs.fetchzip {
+    name = "llama-ui";
+    url = "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/latest/dist.tar.gz?download=true";
+    hash = "sha256-7xNWI6FJH/nuSRCWapn1QptnhTVNlVf9i2hfEg4zzvw=";
+    stripRoot = false;
+  };
 
   downloadModels = pkgs.writeShellApplication {
     name = "download-qwen38-flash-next-model";
@@ -103,14 +114,17 @@ in
         "127.0.0.1"
         "--port"
         "8422"
+        "--webui"
+        "--path"
+        llamaUi
         "--ctx-size"
-        "262144"
+        "524288"
         "--fit"
         "off"
         "--n-gpu-layers"
         "999999"
         "--parallel"
-        "3"
+        "2"
         "--threads"
         "12"
         "--batch-size"
@@ -131,6 +145,8 @@ in
         "mmap"
         "--jinja"
         "--reasoning-preserve"
+        "--reasoning-effort"
+        "low"
         "--temp"
         "1.0"
         "--top-p"
@@ -145,6 +161,70 @@ in
       Restart = "on-failure";
       RestartSec = 30;
       TimeoutStartSec = 1800;
+      TimeoutStopSec = 120;
+      LimitMEMLOCK = "infinity";
+      LimitNOFILE = 1048576;
+    };
+  };
+
+  systemd.services.llama-3-2 = {
+    description = "Llama 3.2 1B Instruct Q4_K_M";
+    wantedBy = [ ];
+    unitConfig.ConditionPathExists = [ llama32Target ];
+    serviceConfig = {
+      Type = "simple";
+      User = "philipp";
+      Group = "users";
+      SupplementaryGroups = [
+        "render"
+        "video"
+      ];
+      Environment = [
+        "HOME=/home/philipp"
+        "GGML_VK_VISIBLE_DEVICES=0"
+      ];
+      ExecStart = lib.escapeShellArgs [
+        "${llamaCppQwen4Exp}/bin/llama-server"
+        "--model"
+        llama32Target
+        "--alias"
+        "llama-3.2-1b-instruct-q4"
+        "--host"
+        "127.0.0.1"
+        "--port"
+        "8423"
+        "--ctx-size"
+        "131072"
+        "--fit"
+        "off"
+        "--n-gpu-layers"
+        "999999"
+        "--parallel"
+        "1"
+        "--threads"
+        "12"
+        "--batch-size"
+        "512"
+        "--ubatch-size"
+        "256"
+        "--flash-attn"
+        "on"
+        "--cache-type-k"
+        "f16"
+        "--cache-type-v"
+        "f16"
+        "--load-mode"
+        "mmap"
+        "--jinja"
+        "--temp"
+        "0.7"
+        "--top-p"
+        "0.9"
+        "--metrics"
+      ];
+      Restart = "on-failure";
+      RestartSec = 30;
+      TimeoutStartSec = 300;
       TimeoutStopSec = 120;
       LimitMEMLOCK = "infinity";
       LimitNOFILE = 1048576;

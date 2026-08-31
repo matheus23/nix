@@ -118,6 +118,68 @@ in
     };
   };
 
+  # Give Ava a private point-to-point network. The host-side proxy below is
+  # the only service exposed on this link; the firewall rejects every other
+  # packet arriving from the container, including connections to host-wide
+  # services such as SSH.
+  containers.ava = {
+    autoStart = true;
+    privateNetwork = true;
+    hostAddress = "10.231.137.1";
+    localAddress = "10.231.137.2";
+    config =
+      { config, pkgs, ... }:
+      {
+        users.users.ava = {
+          isNormalUser = true;
+          shell = pkgs.bashInteractive;
+        };
+
+        environment.systemPackages = with pkgs; [
+          bashInteractive
+          coreutils
+          curl
+          git
+        ];
+
+        environment.variables.LLAMA_SERVER_URL = "http://10.231.137.1:8422";
+
+        system.stateVersion = "25.11";
+      };
+  };
+
+  # llama-server deliberately remains bound to host loopback. This proxy makes
+  # only its HTTP API reachable from Ava's private container link.
+  systemd.services.llama-qwen38-ava-proxy = {
+    description = "Expose Qwen llama-server to the Ava container";
+    wants = [ "container@ava.service" ];
+    after = [ "container@ava.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      DynamicUser = true;
+      ExecStart = "${pkgs.socat}/bin/socat TCP-LISTEN:8422,bind=10.231.137.1,reuseaddr,fork TCP:127.0.0.1:8422";
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      ProtectHome = true;
+      ProtectSystem = "strict";
+      Restart = "on-failure";
+      RestartSec = 3;
+    };
+  };
+
+  # extraCommands is used because this host currently uses the iptables
+  # firewall backend. Insert these before the normal allow rules so the
+  # container cannot use globally allowed host ports.
+  networking.firewall.extraCommands = ''
+    iptables -I nixos-fw 1 -i ve-ava -p tcp -d 10.231.137.1 --dport 8422 -j nixos-fw-accept
+    iptables -I nixos-fw 2 -i ve-ava -j nixos-fw-refuse
+  '';
+  networking.firewall.extraStopCommands = ''
+    iptables -D nixos-fw -i ve-ava -p tcp -d 10.231.137.1 --dport 8422 -j nixos-fw-accept || true
+    iptables -D nixos-fw -i ve-ava -j nixos-fw-refuse || true
+  '';
+
   systemd.tmpfiles.rules = [
     "d /var/lib/wbo 0750 1000 1000 -"
   ];

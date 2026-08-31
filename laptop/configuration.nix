@@ -310,7 +310,7 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
-      Environment = "RUST_LOG=info";
+      Environment = "RUST_LOG=info,iroh=debug";
       ExecStart = "${pigeons}/bin/pigeons roost --ssh-port 2222";
       Restart = "on-failure";
       RestartSec = 3;
