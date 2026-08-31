@@ -40,6 +40,45 @@ let
   mmproj = "${modelDir}/mmproj-F16.gguf";
   llama32Target = "/home/philipp/.lmstudio/models/unsloth/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf";
 
+  modelPreset = pkgs.writeText "llama-server-models.ini" ''
+    version = 1
+
+    [*]
+    n-gpu-layers = 999999
+    threads = 12
+    batch-size = 512
+    ubatch-size = 256
+    flash-attn = on
+    cache-type-k = f16
+    cache-type-v = f16
+    load-mode = mmap
+    jinja = on
+
+    [qwen3.8-flash-next-q4]
+    model = ${target}
+    mmproj = ${mmproj}
+    ctx-size = 524288
+    parallel = 2
+    fit = off
+    override-tensor = per_layer_token_embd=CPU
+    reasoning-preserve = on
+    reasoning-effort = low
+    temp = 1.0
+    top-p = 0.95
+    top-k = 20
+    min-p = 0.0
+    load-on-startup = true
+
+    [llama-3.2-1b-instruct-q4]
+    model = ${llama32Target}
+    ctx-size = 131072
+    parallel = 1
+    fit = off
+    temp = 0.7
+    top-p = 0.9
+    load-on-startup = false
+  '';
+
   # Keep the UI separate from the llama-server binary so the server build does
   # not need npm. The fixed-output hash pins the prebuilt assets from the
   # llama.cpp UI bucket.
@@ -59,14 +98,14 @@ let
     text = builtins.readFile ../scripts/download-qwen38-llama-models.sh;
   };
 
-  enterPerformanceProfile = pkgs.writeShellScript "llama-qwen38-enter-performance" ''
+  enterPerformanceProfile = pkgs.writeShellScript "llama-server-enter-performance" ''
     previous="$(${pkgs.power-profiles-daemon}/bin/powerprofilesctl get)"
-    printf '%s\n' "$previous" > /run/llama-qwen38/previous-power-profile
+    printf '%s\n' "$previous" > /run/llama-server/previous-power-profile
     ${pkgs.power-profiles-daemon}/bin/powerprofilesctl set performance
   '';
 
-  restorePowerProfile = pkgs.writeShellScript "llama-qwen38-restore-power" ''
-    profile_file=/run/llama-qwen38/previous-power-profile
+  restorePowerProfile = pkgs.writeShellScript "llama-server-restore-power" ''
+    profile_file=/run/llama-server/previous-power-profile
     if [[ -s "$profile_file" ]]; then
       ${pkgs.power-profiles-daemon}/bin/powerprofilesctl set "$(<"$profile_file")"
     fi
@@ -79,15 +118,18 @@ in
   ];
 
   # Qwen3.8-Flash-Next is the experimental Qwen4 architecture. Its native MTP
-  # head is not supported by llama.cpp yet, so this service deliberately uses
+  # head is not supported by llama.cpp yet, so its preset deliberately uses
   # target-only decoding until that path has a correctness-tested implementation.
-  systemd.services.llama-qwen38 = {
-    description = "Qwen3.8 Flash Next Q4-XL (experimental Qwen4 architecture)";
+  systemd.services.llama-server = {
+    description = "llama.cpp model router";
     conflicts = [
       "ds4-server.service"
     ];
     wantedBy = [ ];
-    unitConfig.ConditionPathExists = [ "${modelDir}/.verified" ];
+    unitConfig.ConditionPathExists = [
+      "${modelDir}/.verified"
+      llama32Target
+    ];
     serviceConfig = {
       Type = "simple";
       User = "philipp";
@@ -96,7 +138,7 @@ in
         "render"
         "video"
       ];
-      RuntimeDirectory = "llama-qwen38";
+      RuntimeDirectory = "llama-server";
       Environment = [
         "HOME=/home/philipp"
         "GGML_VK_VISIBLE_DEVICES=0"
@@ -104,12 +146,6 @@ in
       ExecStartPre = "+${enterPerformanceProfile}";
       ExecStart = lib.escapeShellArgs [
         "${llamaCppQwen4Exp}/bin/llama-server"
-        "--model"
-        target
-        "--mmproj"
-        mmproj
-        "--alias"
-        "qwen3.8-flash-next-q4"
         "--host"
         "127.0.0.1"
         "--port"
@@ -117,114 +153,16 @@ in
         "--webui"
         "--path"
         llamaUi
-        "--ctx-size"
-        "524288"
-        "--fit"
-        "off"
-        "--n-gpu-layers"
-        "999999"
-        "--parallel"
+        "--models-preset"
+        modelPreset
+        "--models-max"
         "2"
-        "--threads"
-        "12"
-        "--batch-size"
-        "512"
-        "--ubatch-size"
-        "256"
-        "--flash-attn"
-        "on"
-        "--cache-type-k"
-        "f16"
-        "--cache-type-v"
-        "f16"
-        # The 51B n-gram embedding is a sparse lookup table. Keep it host-side
-        # and mmap-backed instead of spending most of unified memory on it.
-        "--override-tensor"
-        "per_layer_token_embd=CPU"
-        "--load-mode"
-        "mmap"
-        "--jinja"
-        "--reasoning-preserve"
-        "--reasoning-effort"
-        "low"
-        "--temp"
-        "1.0"
-        "--top-p"
-        "0.95"
-        "--top-k"
-        "20"
-        "--min-p"
-        "0.0"
         "--metrics"
       ];
       ExecStopPost = "+${restorePowerProfile}";
       Restart = "on-failure";
       RestartSec = 30;
       TimeoutStartSec = 1800;
-      TimeoutStopSec = 120;
-      LimitMEMLOCK = "infinity";
-      LimitNOFILE = 1048576;
-    };
-  };
-
-  systemd.services.llama-3-2 = {
-    description = "Llama 3.2 1B Instruct Q4_K_M";
-    wantedBy = [ ];
-    unitConfig.ConditionPathExists = [ llama32Target ];
-    serviceConfig = {
-      Type = "simple";
-      User = "philipp";
-      Group = "users";
-      SupplementaryGroups = [
-        "render"
-        "video"
-      ];
-      Environment = [
-        "HOME=/home/philipp"
-        "GGML_VK_VISIBLE_DEVICES=0"
-      ];
-      ExecStart = lib.escapeShellArgs [
-        "${llamaCppQwen4Exp}/bin/llama-server"
-        "--model"
-        llama32Target
-        "--alias"
-        "llama-3.2-1b-instruct-q4"
-        "--host"
-        "127.0.0.1"
-        "--port"
-        "8423"
-        "--ctx-size"
-        "131072"
-        "--fit"
-        "off"
-        "--n-gpu-layers"
-        "999999"
-        "--parallel"
-        "1"
-        "--threads"
-        "12"
-        "--batch-size"
-        "512"
-        "--ubatch-size"
-        "256"
-        "--flash-attn"
-        "on"
-        "--cache-type-k"
-        "f16"
-        "--cache-type-v"
-        "f16"
-        "--load-mode"
-        "mmap"
-        "--jinja"
-        "--temp"
-        "0.7"
-        "--top-p"
-        "0.9"
-        "--metrics"
-      ];
-      Restart = "on-failure";
-      RestartSec = 30;
-      TimeoutStartSec = 300;
       TimeoutStopSec = 120;
       LimitMEMLOCK = "infinity";
       LimitNOFILE = 1048576;

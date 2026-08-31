@@ -150,8 +150,8 @@ in
 
   # llama-server deliberately remains bound to host loopback. This proxy makes
   # only its HTTP API reachable from Ava's private container link.
-  systemd.services.llama-qwen38-ava-proxy = {
-    description = "Expose Qwen llama-server to the Ava container";
+  systemd.services.llama-server-ava-proxy = {
+    description = "Expose llama-server to the Ava container";
     wants = [ "container@ava.service" ];
     after = [ "container@ava.service" ];
     wantedBy = [ "multi-user.target" ];
