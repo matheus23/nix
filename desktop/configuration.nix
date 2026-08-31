@@ -15,7 +15,7 @@ in
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
-    ./llama-qwen38.nix
+    ./llama-server.nix
     <home-manager/nixos>
   ];
 
