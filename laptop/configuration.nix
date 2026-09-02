@@ -28,9 +28,9 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
-  # this was needed to get gnome-keyring to actually be able to
-  # have wayland access and be able to show a dialog for auth
+  # GCR needs the graphical session's prompt service before importing keys.
   systemd.user.services.gcr-ssh-agent = {
+    requires = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
     partOf = [ "graphical-session.target" ];
   };
@@ -292,7 +292,7 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
-      Environment = "RUST_LOG=info";
+      Environment = "RUST_LOG=info,iroh=debug";
       ExecStart = "${pigeons}/bin/pigeons roost";
       Restart = "on-failure";
       RestartSec = 3;
