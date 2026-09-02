@@ -39,6 +39,8 @@ let
   target = "${modelDir}/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
   mmproj = "${modelDir}/mmproj-F16.gguf";
   llama32Target = "/home/philipp/.lmstudio/models/unsloth/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf";
+  qwen3Target = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3-0.6B-GGUF/50968a4468ef4233ed78cd7c3de230dd1d61a56b/Qwen3-0.6B-UD-Q6_K_XL.gguf";
+  slotSavePath = "/home/philipp/.cache/ava/slots";
 
   modelPreset = pkgs.writeText "llama-server-models.ini" ''
     version = 1
@@ -71,11 +73,22 @@ let
 
     [llama-3.2-1b-instruct-q4]
     model = ${llama32Target}
-    ctx-size = 131072
+    ctx-size = 20000
     parallel = 1
     fit = off
     temp = 0.7
     top-p = 0.9
+    load-on-startup = false
+
+    [qwen3-0.6b-q6]
+    model = ${qwen3Target}
+    ctx-size = 40000
+    parallel = 2
+    fit = off
+    temp = 0.6
+    top-p = 0.95
+    top-k = 20
+    min-p = 0.0
     load-on-startup = false
   '';
 
@@ -129,6 +142,7 @@ in
     unitConfig.ConditionPathExists = [
       "${modelDir}/.verified"
       llama32Target
+      qwen3Target
     ];
     serviceConfig = {
       Type = "simple";
@@ -156,7 +170,9 @@ in
         "--models-preset"
         modelPreset
         "--models-max"
-        "2"
+        "3"
+        "--slot-save-path"
+        slotSavePath
         "--metrics"
       ];
       ExecStopPost = "+${restorePowerProfile}";
