@@ -14,8 +14,9 @@ freed. To reclaim the space you must remove the file from *every* subvolume
 extents.
 
 This tool:
-  1. Takes a path to a surviving copy of the file/dir (in the live FS or any
-     snapshot) and derives its path relative to its subvolume.
+  1. Takes a path to the file/dir. If the path no longer exists in the live
+     filesystem, it finds the oldest accessible snapshot in the same subvolume
+     family that still contains it and uses that as the reference copy.
   2. Walks the file's data extents and asks the kernel (LOGICAL_INO ioctl)
      exactly which subvolume roots still reference them.
   3. Finds every snapshot whose tree contains the file at that relative path
@@ -99,6 +100,27 @@ def logv(msg, verbose):
 # --------------------------------------------------------------------------- #
 # btrfs mount discovery
 # --------------------------------------------------------------------------- #
+def nearest_existing_path(path):
+    """Return path or its nearest existing parent, or None."""
+    candidate = path
+    while not os.path.lexists(candidate):
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            return None
+        candidate = parent
+    return candidate
+
+
+def missing_path_probe(path):
+    """Return an existing probe and resolved target for a missing path."""
+    existing = nearest_existing_path(path)
+    if existing is None:
+        return None
+    suffix = os.path.relpath(path, existing)
+    probe = os.path.realpath(existing)
+    return probe, os.path.normpath(os.path.join(probe, suffix))
+
+
 def filesystem_fsid(path):
     """Return the btrfs filesystem UUID containing path, or None."""
     try:
@@ -142,7 +164,7 @@ def mount_of_path(path, mounts):
     best = None
     for mnt in mounts:
         target = mnt[0]
-        if path == target or path.startswith(target + "/"):
+        if path == target or target == "/" or path.startswith(target.rstrip("/") + "/"):
             if best is None or len(target) > len(best[0]):
                 best = mnt
     return best
@@ -210,6 +232,50 @@ def resolve_accessible(rootid, mounts, list_mount):
     return accessible_path(toprel, mounts)
 
 
+def snapshot_family(rootid, subvols):
+    """Return related snapshots, ordered oldest first."""
+    root = subvols.get(rootid)
+    if root is None:
+        return []
+
+    adjacency = {}
+    for item in subvols.values():
+        if item.parent_uuid == NIL_UUID:
+            continue
+        adjacency.setdefault(item.uuid, set()).add(item.parent_uuid)
+        adjacency.setdefault(item.parent_uuid, set()).add(item.uuid)
+
+    family_uuids = {root.uuid}
+    pending_uuids = [root.uuid]
+    while pending_uuids:
+        current_uuid = pending_uuids.pop()
+        for related_uuid in adjacency.get(current_uuid, set()):
+            if related_uuid in family_uuids:
+                continue
+            family_uuids.add(related_uuid)
+            pending_uuids.append(related_uuid)
+
+    snapshots = [
+        (item_rootid, item)
+        for item_rootid, item in subvols.items()
+        if item_rootid != rootid and item.uuid in family_uuids
+    ]
+    return sorted(snapshots, key=lambda item: (item[1].otransid, item[0]))
+
+
+def find_snapshot_reference(relpath, live_rootid, subvols, mounts, list_mount, verbose=False):
+    """Return the oldest accessible snapshot copy of relpath, or None."""
+    for rootid, _root in snapshot_family(live_rootid, subvols):
+        access = resolve_accessible(rootid, mounts, list_mount)
+        if access is None:
+            continue
+        candidate = os.path.join(access, relpath)
+        logv("checking snapshot rootid %d -> %s" % (rootid, candidate), verbose)
+        if os.path.lexists(candidate):
+            return candidate, rootid
+    return None
+
+
 def property_get_ro(path):
     """Best-effort read of the read-only flag. Returns True/False or None."""
     try:
@@ -274,12 +340,12 @@ def parse_args(argv):
         epilog=(
             "By default the tool only prints a plan (dry-run). Pass --apply to "
             "perform deletions.\n\n"
-            "Point PATH at any surviving copy of the file (in the live FS or in a "
-            "snapshot). If you already deleted it from the live FS, point at a "
-            "snapshot copy."
+            "PATH may name a surviving copy in the live filesystem or a snapshot. "
+            "If a live path is gone, the oldest accessible related snapshot that "
+            "still contains it is used automatically."
         ),
     )
-    ap.add_argument("path", help="path to the file/dir to scrub (live FS or a snapshot)")
+    ap.add_argument("path", help="live or snapshot path to the file/dir to scrub")
     ap.add_argument("--apply", action="store_true", help="actually perform deletions (default: dry-run)")
     ap.add_argument("-y", "--yes", action="store_true", help="skip confirmation prompt (use with --apply)")
     ap.add_argument("--no-extent-check", action="store_true", help="skip extent-reference analysis")
@@ -302,40 +368,81 @@ def main(argv=None):
     args = parse_args(argv if argv is not None else sys.argv[1:])
 
     target = os.path.abspath(os.path.expanduser(args.path))
-    if not os.path.lexists(target):
-        die("path not found: %s -- point at a surviving copy (live or a snapshot)" % target)
-
     if os.geteuid() != 0:
         die("must run as root (needs btrfs property / subvolume ioctls)")
 
-    is_dir = os.path.isdir(target) and not os.path.islink(target)
-    inum = os.stat(target, follow_symlinks=False).st_ino
-    mounts = btrfs_mounts_for(target)
+    target_exists = os.path.lexists(target)
+    if target_exists:
+        probe = target
+        resolved_target = target
+    else:
+        missing = missing_path_probe(target)
+        if missing is None:
+            die("could not find an existing parent for %s" % target)
+        probe, resolved_target = missing
+
+    mounts = btrfs_mounts_for(probe)
     if not mounts:
         die("could not find a btrfs mount for %s" % target)
-    live_mount = mount_of_path(target, mounts)
+    live_mount = mount_of_path(resolved_target, mounts)
     live_rootid = int(live_mount[2]) if live_mount and live_mount[2] else None
 
     if live_rootid is None:
         die("could not determine the subvolume id of the live mount for %s" % target)
 
-    # reference copy: derive relpath within its subvolume + the subvol root id
-    with btrfs.FileSystem(target) as fs:
-        res = btrfs.ioctl.ino_lookup(fs.fd, objectid=inum)
+    # Reference copy: use the requested path when present. Otherwise derive its
+    # path within the live subvolume and find the oldest snapshot containing it.
+    with btrfs.FileSystem(probe) as fs:
+        subvols = {ri.objectid: ri for ri in fs.subvolumes()}
+
+        if target_exists:
+            reference = target
+            inum = os.stat(reference, follow_symlinks=False).st_ino
+            res = btrfs.ioctl.ino_lookup(fs.fd, objectid=inum)
+            # The INO_LOOKUP ioctl appends a trailing '/' to the path. Strip it,
+            # otherwise isfile()/isdir() reject the candidate (trailing slash means
+            # "directory") and the path-based scrub set comes back empty.
+            relpath = res.name_bytes.decode("utf-8", "surrogateescape").rstrip("/")
+        else:
+            probe_inum = os.stat(probe, follow_symlinks=False).st_ino
+            probe_res = btrfs.ioctl.ino_lookup(fs.fd, objectid=probe_inum)
+            live_rootid = probe_res.treeid
+            probe_relpath = probe_res.name_bytes.decode(
+                "utf-8", "surrogateescape"
+            ).rstrip("/")
+            missing_relpath = os.path.relpath(resolved_target, probe)
+            relpath = os.path.normpath(os.path.join(probe_relpath, missing_relpath))
+            found = find_snapshot_reference(
+                relpath,
+                live_rootid,
+                subvols,
+                mounts,
+                live_mount[0],
+                args.verbose,
+            )
+            if found is None:
+                die("path not found in the live subvolume or any accessible snapshot: %s" % target)
+            reference, reference_rootid = found
+            logv(
+                "using oldest matching snapshot rootid %d -> %s"
+                % (reference_rootid, reference),
+                args.verbose,
+            )
+            inum = os.stat(reference, follow_symlinks=False).st_ino
+            res = btrfs.ioctl.ino_lookup(
+                fs.fd, treeid=reference_rootid, objectid=inum
+            )
+
         ref_root = res.treeid
-        # The INO_LOOKUP ioctl appends a trailing '/' to the path. Strip it,
-        # otherwise isfile()/isdir() reject the candidate (trailing slash means
-        # "directory") and the path-based scrub set comes back empty.
-        relpath = res.name_bytes.decode("utf-8", "surrogateescape").rstrip("/")
         if not relpath:
             die("refusing to scrub a subvolume root itself; point at a file/dir inside it")
 
-        subvols = {ri.objectid: ri for ri in fs.subvolumes()}
+        is_dir = os.path.isdir(reference) and not os.path.islink(reference)
 
         # files whose extents drive the extent-aware reference check
         ref_files = []  # list of (inum, abspath)
         if is_dir:
-            for root, _dirs, files in os.walk(target):
+            for root, _dirs, files in os.walk(reference):
                 for fn in files:
                     p = os.path.join(root, fn)
                     if os.path.islink(p):
@@ -346,7 +453,7 @@ def main(argv=None):
                         continue
                     ref_files.append((st.st_ino, p))
         else:
-            ref_files.append((inum, target))
+            ref_files.append((inum, reference))
 
         extent_roots = {}  # rootid -> set(inum)
         ref_total_size = 0
@@ -443,6 +550,8 @@ def main(argv=None):
 
     # ---- print plan ----
     print("target      : %s" % target)
+    if reference != target:
+        print("reference   : %s  (oldest accessible matching snapshot)" % reference)
     print("type        : %s" % ("directory" if is_dir else "file"))
     print("rel. path   : %s  (within subvolume rootid %d)" % (relpath, ref_root))
     print("live subvol : rootid %d  (%s)" % (live_rootid, live_mount[0]))

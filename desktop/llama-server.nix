@@ -12,10 +12,10 @@ let
       blasSupport = false;
     }).overrideAttrs
       (old: {
-        version = "0-unstable-2026-08-27-qwen4exp";
+        version = "0-unstable-2026-09-04-qwen4exp";
         src = pkgs.fetchzip {
-          url = "https://github.com/unslothai/llama.cpp/archive/6c5afc86ae84448ae4d744e357017e2c490ad9c3.tar.gz";
-          hash = "sha256-6qMeFRuSn/5CEU/AN6sArXJzQfC4rhSlPXuHGHmMGwU=";
+          url = "https://github.com/ggml-org/llama.cpp/archive/38521ec33fc93f0ce40963ab88624134bd347e9b.tar.gz";
+          hash = "sha256-oWuXDjrjVruK6D6kKKLIN/gFZwPl79Bgw256DR4Dtkk=";
         };
         # Avoid prefaulting the full model alongside its Vulkan copy, and mark
         # the host-side PLE range as random-access. Remove this when upstream
@@ -23,7 +23,7 @@ let
         patches = (old.patches or [ ]) ++ [ ./llama-qwen38-random-ple.patch ];
         buildInputs = old.buildInputs ++ [ pkgs.spirv-headers ];
         preConfigure = ''
-          printf '%s\n' 6c5afc86ae84448ae4d744e357017e2c490ad9c3 > COMMIT
+          printf '%s\n' 38521ec33fc93f0ce40963ab88624134bd347e9b > COMMIT
         ''
         + old.preConfigure;
         cmakeFlags =
@@ -55,6 +55,7 @@ let
     cache-type-v = f16
     load-mode = mmap
     jinja = on
+    cont-batching = off
 
     [qwen3.8-flash-next-q4]
     model = ${target}

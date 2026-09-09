@@ -69,7 +69,7 @@ diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
 index 5071556a..e4787971 100644
 --- a/src/llama-model-loader.cpp
 +++ b/src/llama-model-loader.cpp
-@@ -1351,6 +1351,11 @@ void llama_model_loader::done_getting_tensors(bool partial) const {
+@@ -1382,6 +1382,11 @@ void llama_model_loader::done_getting_tensors(bool partial) const {
  }
  
  void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps) {
@@ -78,10 +78,12 @@ index 5071556a..e4787971 100644
 +        prefetch = false;
 +    }
 +
+     // note: read_lazy also requires mmap; this condition make sure it's usable even when --load-mode is not set to mmap
+     if (use_mmap || lazy.any()) {
      if (use_mmap) {
          mappings.reserve(files.size());
          mmaps_used.reserve(files.size());
-@@ -1375,6 +1380,12 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
+@@ -1418,6 +1423,12 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
              }
              mappings.emplace_back(std::move(mapping));
          }

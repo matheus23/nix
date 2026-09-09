@@ -11,7 +11,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "btrfs-snap-scrub";
-  version = "0.1.1";
+  version = "0.1.2";
 
   src = ./btrfs-snap-scrub.py;
 
