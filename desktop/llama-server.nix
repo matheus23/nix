@@ -60,7 +60,7 @@ let
     [qwen3.8-flash-next-q4]
     model = ${target}
     mmproj = ${mmproj}
-    ctx-size = 524288
+    ctx-size = 262144
     parallel = 2
     fit = off
     override-tensor = per_layer_token_embd=CPU

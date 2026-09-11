@@ -276,7 +276,7 @@ in
       "NetworkManager-wait-online.service"
       "nss-lookup.target"
     ];
-    wantedBy = [ ]; # manual start only: sudo systemctl start ds4-server
+    wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
       Environment = "RUST_LOG=info";
