@@ -12,18 +12,20 @@ let
       blasSupport = false;
     }).overrideAttrs
       (old: {
-        version = "0-unstable-2026-09-04-qwen4exp";
+        version = "0-unstable-2026-09-21-qwen4exp-direct-rows";
         src = pkgs.fetchzip {
-          url = "https://github.com/ggml-org/llama.cpp/archive/38521ec33fc93f0ce40963ab88624134bd347e9b.tar.gz";
-          hash = "sha256-oWuXDjrjVruK6D6kKKLIN/gFZwPl79Bgw256DR4Dtkk=";
+          url = "https://github.com/ggml-org/llama.cpp/archive/6f41ac59e0a49a00483a316a22ada6b04edd2950.tar.gz";
+          hash = "sha256-d9dRcpOeyxC477iSWzxCEG3XyBploQGsjiVCaHHNjZk=";
         };
-        # Avoid prefaulting the full model alongside its Vulkan copy, and mark
-        # the host-side PLE range as random-access. Remove this when upstream
-        # issue #27766 gains equivalent per-tensor mmap policy.
-        patches = (old.patches or [ ]) ++ [ ./llama-qwen38-random-ple.patch ];
+        # Use upstream PR #29030 for explicit, parallel reads of lazy PLE rows.
+        # Keep the local mmap policy workaround as a separate rebased patch.
+        patches = (old.patches or [ ]) ++ [
+          ./llama-qwen38-direct-rows.patch
+          ./llama-qwen38-random-ple.patch
+        ];
         buildInputs = old.buildInputs ++ [ pkgs.spirv-headers ];
         preConfigure = ''
-          printf '%s\n' 38521ec33fc93f0ce40963ab88624134bd347e9b > COMMIT
+          printf '%s\n' 6f41ac59e0a49a00483a316a22ada6b04edd2950 > COMMIT
         ''
         + old.preConfigure;
         cmakeFlags =
@@ -42,56 +44,92 @@ let
   qwen3Target = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3-0.6B-GGUF/50968a4468ef4233ed78cd7c3de230dd1d61a56b/Qwen3-0.6B-UD-Q6_K_XL.gguf";
   slotSavePath = "/home/philipp/.cache/ava/slots";
 
-  modelPreset = pkgs.writeText "llama-server-models.ini" ''
-    version = 1
+  # Models exposed by the llama-server router. Comment out an entry to disable
+  # that model; --models-max and ConditionPathExists follow this list.
+  models = [
+    {
+      name = "qwen3.8-flash-next-q4";
+      model = target;
+      mmproj = mmproj;
+      # Qwen3.8-Flash-Next is the experimental Qwen4 architecture. Its native
+      # MTP head is not supported by llama.cpp yet, so this preset deliberately
+      # uses target-only decoding until that path has a correctness-tested
+      # implementation.
+      settings = {
+        ctx-size = 262144;
+        parallel = 2;
+        fit = "off";
+        lazy-mode = "on-direct";
+        override-tensor = "per_layer_token_embd=CPU";
+        reasoning-preserve = "on";
+        reasoning-effort = "low";
+        temp = 1.0;
+        top-p = 0.95;
+        top-k = 20;
+        min-p = 0.0;
+        load-on-startup = true;
+      };
+    }
+    # {
+    #   name = "llama-3.2-1b-instruct-q4";
+    #   model = llama32Target;
+    #   settings = {
+    #     ctx-size = 20000;
+    #     parallel = 1;
+    #     fit = "off";
+    #     temp = 0.7;
+    #     top-p = 0.9;
+    #     load-on-startup = false;
+    #   };
+    # }
+    # {
+    #   name = "qwen3-0.6b-q6";
+    #   model = qwen3Target;
+    #   settings = {
+    #     ctx-size = 40000;
+    #     parallel = 2;
+    #     fit = "off";
+    #     temp = 0.6;
+    #     top-p = 0.95;
+    #     top-k = 20;
+    #     min-p = 0.0;
+    #     load-on-startup = false;
+    #   };
+    # }
+  ];
 
-    [*]
-    n-gpu-layers = 999999
-    threads = 12
-    batch-size = 512
-    ubatch-size = 256
-    flash-attn = on
-    cache-type-k = f16
-    cache-type-v = f16
-    load-mode = mmap
-    jinja = on
-    cont-batching = off
+  formatValue =
+    v: if builtins.isBool v then (if v then "true" else "false") else builtins.toString v;
 
-    [qwen3.8-flash-next-q4]
-    model = ${target}
-    mmproj = ${mmproj}
-    ctx-size = 262144
-    parallel = 2
-    fit = off
-    override-tensor = per_layer_token_embd=CPU
-    reasoning-preserve = on
-    reasoning-effort = low
-    temp = 1.0
-    top-p = 0.95
-    top-k = 20
-    min-p = 0.0
-    load-on-startup = true
+  formatSettings =
+    settings: lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "${k} = ${formatValue v}") settings);
 
-    [llama-3.2-1b-instruct-q4]
-    model = ${llama32Target}
-    ctx-size = 20000
-    parallel = 1
-    fit = off
-    temp = 0.7
-    top-p = 0.9
-    load-on-startup = false
+  modelPreset = pkgs.writeText "llama-server-models.ini" (
+    ''
+      version = 1
 
-    [qwen3-0.6b-q6]
-    model = ${qwen3Target}
-    ctx-size = 40000
-    parallel = 2
-    fit = off
-    temp = 0.6
-    top-p = 0.95
-    top-k = 20
-    min-p = 0.0
-    load-on-startup = false
-  '';
+      [*]
+      n-gpu-layers = 999999
+      threads = 12
+      batch-size = 512
+      ubatch-size = 256
+      flash-attn = on
+      cache-type-k = f16
+      cache-type-v = f16
+      load-mode = mmap
+      jinja = on
+      cont-batching = off
+    ''
+    + lib.concatMapStrings (
+      m:
+      "\n[${m.name}]\nmodel = ${m.model}\n"
+      + lib.optionalString (m ? mmproj) "mmproj = ${m.mmproj}\n"
+      + formatSettings m.settings
+      + "\n"
+    ) models
+  );
+
+  modelPaths = map (m: m.model) models;
 
   # Keep the UI separate from the llama-server binary so the server build does
   # not need npm. The fixed-output hash pins the prebuilt assets from the
@@ -131,20 +169,13 @@ in
     llamaCppQwen4Exp
   ];
 
-  # Qwen3.8-Flash-Next is the experimental Qwen4 architecture. Its native MTP
-  # head is not supported by llama.cpp yet, so its preset deliberately uses
-  # target-only decoding until that path has a correctness-tested implementation.
   systemd.services.llama-server = {
     description = "llama.cpp model router";
     conflicts = [
       "ds4-server.service"
     ];
     wantedBy = [ ];
-    unitConfig.ConditionPathExists = [
-      "${modelDir}/.verified"
-      llama32Target
-      qwen3Target
-    ];
+    unitConfig.ConditionPathExists = [ "${modelDir}/.verified" ] ++ modelPaths;
     serviceConfig = {
       Type = "simple";
       User = "philipp";
@@ -171,7 +202,7 @@ in
         "--models-preset"
         modelPreset
         "--models-max"
-        "3"
+        (toString (builtins.length models))
         "--slot-save-path"
         slotSavePath
         "--metrics"
