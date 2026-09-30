@@ -171,9 +171,6 @@ in
 
   systemd.services.llama-server = {
     description = "llama.cpp model router";
-    conflicts = [
-      "ds4-server.service"
-    ];
     wantedBy = [ ];
     unitConfig.ConditionPathExists = [ "${modelDir}/.verified" ] ++ modelPaths;
     serviceConfig = {
