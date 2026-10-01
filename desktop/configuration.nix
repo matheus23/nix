@@ -16,6 +16,7 @@ in
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
     ./llama-server.nix
+    ./gufo-server.nix
     <home-manager/nixos>
   ];
 
