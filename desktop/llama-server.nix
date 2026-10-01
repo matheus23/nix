@@ -12,20 +12,21 @@ let
       blasSupport = false;
     }).overrideAttrs
       (old: {
-        version = "0-unstable-2026-09-21-qwen4exp-direct-rows";
+        version = "0-unstable-2026-09-30-qwen4exp-direct-rows";
         src = pkgs.fetchzip {
-          url = "https://github.com/ggml-org/llama.cpp/archive/6f41ac59e0a49a00483a316a22ada6b04edd2950.tar.gz";
-          hash = "sha256-d9dRcpOeyxC477iSWzxCEG3XyBploQGsjiVCaHHNjZk=";
+          url = "https://github.com/ggml-org/llama.cpp/archive/db00347a4b33393bf53986e976fe8505bbf92665.tar.gz";
+          hash = "sha256-ylyKUAGCRC43328I6p5kW2o2BUOZLkmg+TEXxdTi9Tw=";
         };
-        # Use upstream PR #29030 for explicit, parallel reads of lazy PLE rows.
-        # Keep the local mmap policy workaround as a separate rebased patch.
+        # PR #29030 is not merged yet; keep its latest seven-commit series as a
+        # local patch for explicit, parallel reads of lazy PLE rows. The second
+        # patch remains a local mmap policy workaround for the unified-memory GPU.
         patches = (old.patches or [ ]) ++ [
           ./llama-qwen38-direct-rows.patch
           ./llama-qwen38-random-ple.patch
         ];
         buildInputs = old.buildInputs ++ [ pkgs.spirv-headers ];
         preConfigure = ''
-          printf '%s\n' 6f41ac59e0a49a00483a316a22ada6b04edd2950 > COMMIT
+          printf '%s\n' db00347a4b33393bf53986e976fe8505bbf92665 > COMMIT
         ''
         + old.preConfigure;
         cmakeFlags =
@@ -59,7 +60,7 @@ let
         ctx-size = 262144;
         parallel = 2;
         fit = "off";
-        lazy-mode = "on-direct";
+        lazy-mode = "on";
         override-tensor = "per_layer_token_embd=CPU";
         reasoning-preserve = "on";
         reasoning-effort = "low";
