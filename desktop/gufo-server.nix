@@ -13,6 +13,10 @@ let
     model = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
     servedModelName = "qwen3.8-flash-next-q4";
     context = 262144;
+    speculative = "mtp";
+    mtpModel = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf";
+    draftTokens = 7;
+    minDraftTokens = 1;
     think = "on";
     reasoningEffort = "low";
     preserveThinking = "on";
