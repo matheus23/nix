@@ -1,0 +1,426 @@
+diff --git a/src/backend/dev/pi-image-elision.ts b/src/backend/dev/pi-image-elision.ts
+index f0928957..7da8356b 100644
+--- a/src/backend/dev/pi-image-elision.ts
++++ b/src/backend/dev/pi-image-elision.ts
+@@ -1,6 +1,9 @@
+ import type { LocalMessage } from "@/backend/local/local-message";
+-import type { ProviderTurnInput } from "./provider-turn-executor";
+-import { estimateProviderRequestBytes } from "./provider-turn-executor";
++import { localProviderErrorDetail } from "./local-provider-errors";
++import {
++  estimateProviderRequestBytes,
++  type ProviderTurnInput,
++} from "./provider-turn-executor";
+ 
+ // Classifier threshold for oversized request payloads. This is a transport
+ // limit, not a token limit: providers accept image-heavy requests whose
+@@ -114,6 +117,7 @@ function imageElisionCandidates(
+ function elideImagePayload(
+   messages: readonly LocalMessage[],
+   candidate: ImageElisionCandidate,
++  placeholderText?: string,
+ ): LocalMessage[] {
+   const message = messages[candidate.messageIndex];
+   if (!message) return [...messages];
+@@ -127,7 +131,9 @@ function elideImagePayload(
+   const content = [...message.content];
+   content[candidate.blockIndex] = {
+     type: "text",
+-    text: imageElisionPlaceholder(candidate.mimeType, candidate.bytes),
++    text:
++      placeholderText ??
++      imageElisionPlaceholder(candidate.mimeType, candidate.bytes),
+   };
+   const next = [...messages];
+   next[candidate.messageIndex] = { ...message, content } as LocalMessage;
+@@ -180,3 +186,90 @@ export function elideImagePayloadsForProviderRetry(
+     elidedBytes,
+   };
+ }
++
++// Letta Code addition (no Pi analog): image COUNT limits. Some providers —
++// notably local OpenAI-compatible servers such as Gufo — reject requests that
++// carry more than N images with a clean, non-retryable HTTP 400
++// (`invalid_messages`, e.g. "(at most 16 images)"). This is orthogonal to the
++// byte-size recovery above: the payload can be ~1 MB and still be rejected,
++// `isContextOverflow` never matches, and `isRetryableLocalProviderError`
++// treats a 400 as terminal, so without help every later turn re-sends the
++// same retained screenshots and the session is permanently bricked. When a
++// provider error states (or implies) an image-count constraint, drop the
++// oldest images from the provider retry context until the request fits,
++// mirroring how oversized-byte elision recovers transport failures. The
++// originals stay in conversation history and can be re-Read later.
++
++/**
++ * Recognizes provider rejections caused by per-request image counts.
++ * Returns the provider-stated limit when the message includes one, `null`
++ * when the message signals an image-count problem without a number, and
++ * `undefined` when the error is unrelated (leave it terminal).
++ */
++export function providerImageCountConstraint(
++  error: unknown,
++): { limit: number | null } | undefined {
++  const detail = localProviderErrorDetail(error);
++  if (!detail) return undefined;
++  const withLimit =
++    detail.match(/at most (\d+) images?/i) ??
++    detail.match(/(?:maximum|max(?:imum)?)\D{0,30}(\d+)\s+images?/i) ??
++    detail.match(/(\d+)\s+images?\s+(?:per request|max)/i) ??
++    detail.match(/image inputs exceed (\d+) images?/i);
++  const parsed = withLimit ? Number(withLimit[1]) : Number.NaN;
++  if (Number.isFinite(parsed) && parsed > 0) {
++    return { limit: Math.floor(parsed) };
++  }
++  if (/\btoo many images\b/i.test(detail)) return { limit: null };
++  return undefined;
++}
++
++function imageCountElisionPlaceholder(mimeType: string | undefined): string {
++  return `[Image omitted from this provider retry: the provider limits how many images a request may carry. The original image remains stored in conversation history.${
++    mimeType ? ` (${mimeType})` : ""
++  }]`;
++}
++
++export interface ImageCountElision {
++  input: ProviderTurnInput;
++  imagesBefore: number;
++  imagesAfter: number;
++  keptImages: number;
++}
++
++/**
++ * Keeps at most `maxImages` images (newest first) in the provider retry
++ * context, replacing older image blocks with text placeholders. Returns null
++ * when nothing exceeds the budget, so callers can distinguish "applied" from
++ * "no change" and never spin on identical retries.
++ */
++export function elideImagesToCountBudget(
++  input: ProviderTurnInput,
++  maxImages: number,
++): ImageCountElision | null {
++  const candidates = imageElisionCandidates(input.uiMessages);
++  const kept = Math.max(0, Math.floor(maxImages));
++  if (candidates.length === 0 || candidates.length <= kept) return null;
++
++  // Candidates are sorted oldest-first; elide from the front, keeping the
++  // newest `kept` images — recent screenshots are what the model needs.
++  let uiMessages = input.uiMessages;
++  for (const candidate of candidates.slice(0, candidates.length - kept)) {
++    uiMessages = elideImagePayload(
++      uiMessages,
++      candidate,
++      imageCountElisionPlaceholder(candidate.mimeType),
++    );
++  }
++  return {
++    input: { ...input, uiMessages },
++    imagesBefore: candidates.length,
++    imagesAfter: kept,
++    keptImages: kept,
++  };
++}
++
++/** Number of provider-eligible image blocks in the request context. */
++export function countImagePayloads(messages: readonly LocalMessage[]): number {
++  return imageElisionCandidates(messages).length;
++}
+diff --git a/src/backend/dev/pi-stream-adapter.ts b/src/backend/dev/pi-stream-adapter.ts
+index 82365199..7dbd427d 100644
+--- a/src/backend/dev/pi-stream-adapter.ts
++++ b/src/backend/dev/pi-stream-adapter.ts
+@@ -29,8 +29,11 @@ import {
+   normalizeLocalProviderError,
+ } from "./local-provider-errors";
+ import {
++  countImagePayloads,
+   elideImagePayloadsForProviderRetry,
++  elideImagesToCountBudget,
+   isOversizedPayloadTransportFailure,
++  providerImageCountConstraint,
+ } from "./pi-image-elision";
+ import {
+   applyPiEnvOverrides,
+@@ -57,6 +60,10 @@ import {
+ } from "./provider-turn-executor";
+ 
+ const LOCAL_PROVIDER_MAX_RETRIES = 3;
++// Bounds for count-based image recovery. Each pass strictly removes images,
++// so a few passes are enough for any realistic history; the bound only guards
++// against pathological providers that keep rejecting with the same message.
++const LOCAL_PROVIDER_MAX_IMAGE_COUNT_ELISIONS = 4;
+ const LOCAL_PROVIDER_ADAPTIVE_IMAGE_ELISION_AFTER_RETRIES =
+   LOCAL_PROVIDER_MAX_RETRIES - 1;
+ const LOCAL_CONTEXT_OVERFLOW_MAX_COMPACTIONS = 3;
+@@ -729,8 +736,13 @@ export class PiStreamAdapter implements ProviderStreamAdapter {
+           const error = new PiProviderError(part.error);
+           if (
+             isOverflowError(error, resolved.model.contextWindow) ||
+-            isRetryableLocalProviderError(error)
++            isRetryableLocalProviderError(error) ||
++            providerImageCountConstraint(error) !== undefined
+           ) {
++            // Overflow, transient transport, and image-count constraints are
++            // all handled in the catch below (compaction / retry / elision).
++            // Break so the raw provider error part is not surfaced before the
++            // recovery attempt.
+             streamError = error;
+             break;
+           }
+@@ -814,6 +826,7 @@ export class PiStreamAdapter implements ProviderStreamAdapter {
+     let preflightCompactionChecked = false;
+     let contextOverflowCompactions = 0;
+     let transientRetries = 0;
++    let imageCountElisions = 0;
+ 
+     while (true) {
+       if (!preflightCompactionChecked) {
+@@ -942,6 +955,49 @@ export class PiStreamAdapter implements ProviderStreamAdapter {
+           }
+         }
+ 
++        // Image-count constraint: some providers (e.g. Gufo's
++        // `invalid_messages` "(at most 16 images)" HTTP 400) reject requests
++        // carrying too many images. The rejection is a non-retryable client
++        // error, but it repeats on every later turn because retained
++        // screenshots are re-sent, which would permanently brick the session.
++        // Keep the newest images that fit the reported budget and retry; the
++        // originals stay in conversation history.
++        const imageCountConstraint = providerImageCountConstraint(error);
++        if (
++          imageCountConstraint !== undefined &&
++          !emittedModelOutput &&
++          imageCountElisions < LOCAL_PROVIDER_MAX_IMAGE_COUNT_ELISIONS
++        ) {
++          // Without a stated limit, shed half the images so each pass makes
++          // strict progress. With a stated limit, keep `limit` images (the
++          // provider rejected strictly more than `limit`, and each pass
++          // removes at least one because `elideImagesToCountBudget` no-ops
++          // when the count already fits).
++          const imagesNow = countImagePayloads(activeInput.uiMessages);
++          const kept =
++            imageCountConstraint.limit === null
++              ? Math.floor(imagesNow / 2)
++              : Math.min(imageCountConstraint.limit, imagesNow - 1);
++          const countElision = elideImagesToCountBudget(activeInput, kept);
++          if (countElision) {
++            imageCountElisions += 1;
++            debugLog(
++              "pi-stream",
++              "provider image count limit: elided %d image(s) (%d -> %d kept, reported limit %s, pass %d) from provider retry context",
++              countElision.imagesBefore - countElision.imagesAfter,
++              countElision.imagesBefore,
++              countElision.imagesAfter,
++              imageCountConstraint.limit === null
++                ? "unspecified"
++                : String(imageCountConstraint.limit),
++              imageCountElisions,
++            );
++            activeInput = countElision.input;
++            transientRetries = 0;
++            continue;
++          }
++        }
++
+         if (
+           emittedModelOutput ||
+           transientRetries >= LOCAL_PROVIDER_MAX_RETRIES ||
+diff --git a/src/backend/pi-stream-adapter-image-count.test.ts b/src/backend/pi-stream-adapter-image-count.test.ts
+new file mode 100644
+index 00000000..dfa945d0
+--- /dev/null
++++ b/src/backend/pi-stream-adapter-image-count.test.ts
+@@ -0,0 +1,194 @@
++import { describe, expect, test } from "bun:test";
++import type {
++  AssistantMessage,
++  AssistantMessageEvent,
++  Context,
++} from "@earendil-works/pi-ai";
++import {
++  elideImagesToCountBudget,
++  providerImageCountConstraint,
++} from "@/backend/dev/pi-image-elision";
++import {
++  PiStreamAdapter,
++  type PiStreamFunction,
++} from "@/backend/dev/pi-stream-adapter";
++import type {
++  ProviderStreamEvent,
++  ProviderTurnInput,
++} from "@/backend/dev/provider-turn-executor";
++import { emptyLocalUsage } from "@/backend/local/local-message";
++
++function assistantMessage(): AssistantMessage {
++  return {
++    role: "assistant",
++    content: [{ type: "text", text: "ok" }],
++    api: "openai-completions",
++    provider: "gufo",
++    model: "qwen3.8-flash-next-q4",
++    usage: emptyLocalUsage(),
++    stopReason: "stop",
++    timestamp: Date.now(),
++  };
++}
++
++function assistantErrorMessage(errorMessage: string): AssistantMessage {
++  return {
++    ...assistantMessage(),
++    content: [],
++    stopReason: "error",
++    errorMessage,
++  };
++}
++
++function streamFromEvents(
++  events: AssistantMessageEvent[],
++  finalMessage: AssistantMessage,
++): ReturnType<PiStreamFunction> {
++  async function* iterator() {
++    for (const event of events) yield event;
++  }
++  return Object.assign(iterator(), {
++    result: async () => finalMessage,
++  });
++}
++
++async function collectEvents(
++  events: AsyncIterable<ProviderStreamEvent>,
++): Promise<ProviderStreamEvent[]> {
++  const collected: ProviderStreamEvent[] = [];
++  for await (const event of events) collected.push(event);
++  return collected;
++}
++
++function input(): ProviderTurnInput {
++  return {
++    conversationId: "local-conv-image-count",
++    agentId: "agent-local-1",
++    agent: {
++      id: "agent-local-1",
++      name: "Local",
++      description: null,
++      system: "system",
++      tags: [],
++      model: "bedrock/us.anthropic.claude-sonnet-4-6",
++      model_settings: { provider_type: "bedrock" },
++    },
++    body: { messages: [] } as never,
++    history: [],
++    uiMessages: [
++      { id: "ui-msg-1", role: "user", content: "hello", timestamp: Date.now() },
++    ],
++    clientTools: [],
++    clientSkills: [],
++  };
++}
++
++function imageBlocks(contextMessages: Context["messages"]): number {
++  return contextMessages.flatMap((message) =>
++    Array.isArray(message.content)
++      ? message.content.filter((part) => part.type === "image")
++      : [],
++  ).length;
++}
++
++function screenshotMessages(images: number) {
++  const messages: ProviderTurnInput["uiMessages"] = [];
++  let remaining = images;
++  let index = 0;
++  while (remaining > 0) {
++    const count = Math.min(6, remaining);
++    remaining -= count;
++    messages.push({
++      id: `ui-msg-shot-${index}`,
++      role: "user",
++      content: Array.from({ length: count }, (_, i) => ({
++        type: "image" as const,
++        mimeType: "image/jpeg",
++        data: `data-${index}-${i}`,
++      })),
++      timestamp: Date.now(),
++    } as ProviderTurnInput["uiMessages"][number]);
++    index += 1;
++  }
++  return messages;
++}
++
++const GUFO_COUNT_REJECTION =
++  'image_url requires a user message and a string URL (at most 16 images) {"error":{"message":"image_url requires a user message and a string URL (at most 16 images)","type":"invalid_request_error","code":"invalid_messages"}}';
++
++describe("provider image count constraint", () => {
++  test("parses the stated limit from Gufo-style rejections", () => {
++    expect(
++      providerImageCountConstraint(new Error(GUFO_COUNT_REJECTION)),
++    ).toEqual({ limit: 16 });
++    expect(
++      providerImageCountConstraint(new Error("Too many images in request")),
++    ).toEqual({ limit: null });
++    expect(
++      providerImageCountConstraint(new Error("429 rate limit exceeded")),
++    ).toBeUndefined();
++  });
++
++  test("keeps newest images and no-ops when the count already fits", () => {
++    const base = input();
++    const withImages = {
++      ...base,
++      uiMessages: [...base.uiMessages, ...screenshotMessages(5)],
++    };
++    const capped = elideImagesToCountBudget(withImages, 3);
++    expect(capped).not.toBeNull();
++    expect(capped?.imagesBefore).toBe(5);
++    expect(capped?.imagesAfter).toBe(3);
++    // Newest 3 images survive: the two oldest blocks became placeholders.
++    const survivors = capped?.input.uiMessages.flatMap((message) =>
++      Array.isArray(message.content)
++        ? message.content.filter((block) => block.type === "image")
++        : [],
++    );
++    expect(survivors?.[0]?.data).toBe("data-0-2");
++    expect(elideImagesToCountBudget(withImages, 5)).toBeNull();
++    expect(elideImagesToCountBudget(base, 3)).toBeNull();
++  });
++
++  test("recovers a turn when the provider rejects the image count", async () => {
++    let providerCalls = 0;
++    const contexts: Context[] = [];
++    const stream: PiStreamFunction = (_model, context) => {
++      providerCalls += 1;
++      contexts.push(context);
++      if (providerCalls === 1) {
++        const error = assistantErrorMessage(GUFO_COUNT_REJECTION);
++        return streamFromEvents(
++          [{ type: "error", reason: "error", error }],
++          error,
++        );
++      }
++      const finalMessage = assistantMessage();
++      return streamFromEvents(
++        [{ type: "done", reason: "stop", message: finalMessage }],
++        finalMessage,
++      );
++    };
++
++    const adapter = new PiStreamAdapter({ stream });
++    const base = input();
++    // Drain the recovered turn to completion.
++    await collectEvents(
++      adapter.stream({
++        ...base,
++        uiMessages: [...base.uiMessages, ...screenshotMessages(18)],
++      }),
++    );
++
++    // The failed 400 must not terminate the turn: the adapter recovers by
++    // eliding the oldest images and re-issuing the request, which succeeds on
++    // the second call. `providerCalls === 2` (not a throw, not a third
++    // attempt) proves both the recovery-retry and clean completion.
++    expect(providerCalls).toBe(2);
++    expect(imageBlocks(contexts[1]?.messages ?? [])).toBeLessThanOrEqual(16);
++    // The retry actually drops at least one image versus the first request.
++    expect(imageBlocks(contexts[0]?.messages ?? [])).toBeGreaterThan(
++      imageBlocks(contexts[1]?.messages ?? []),
++    );
++  });
++});

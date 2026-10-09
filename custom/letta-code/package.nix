@@ -23,6 +23,17 @@ buildNpmPackage rec {
   # The directory input is unpacked below the standard `source` directory.
   sourceRoot = "source";
 
+  # Recover turns when a local provider rejects the per-request image COUNT
+  # (e.g. Gufo's HTTP 400 "at most 16 images") by eliding oldest images from
+  # the provider retry context, instead of permanently bricking the session.
+  # Remove this patch once upstream ships an equivalent fix
+  # (letta-ai/letta-code: reactive elision exists for byte-size, not count).
+  patches = [
+    ./local-image-count-recovery.patch
+    # Keep commit and PR messages free of co-author Letta attribution stuff.
+    ./no-generated-attribution.patch
+  ];
+
   # The repository uses Bun's lockfile, while buildNpmPackage uses npm. Vendor
   # an npm lockfile generated from this exact source revision.
   # Remove the prepare script because it installs Git hooks during the build.

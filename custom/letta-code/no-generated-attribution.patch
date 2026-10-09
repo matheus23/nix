@@ -1,0 +1,169 @@
+--- a/src/tools/descriptions/Bash.md
++++ b/src/tools/descriptions/Bash.md
+@@ -68,10 +68,7 @@
+   - Ensure it accurately reflects the changes and their purpose
+ 3. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, run multiple tool calls in parallel for optimal performance. run the following commands:
+    - Add relevant untracked files to the staging area.
+-   - Create the commit with a message ending with:
+-   👾 Generated with [Letta Code](https://letta.com)
+-
+-   Co-Authored-By: Letta Code <noreply@letta.com>
++   - Create the commit with the drafted message.
+    - Run git status after the commit completes to verify success.
+    Note: git status depends on the commit completing, so run it sequentially after the commit.
+ 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
+@@ -87,9 +84,7 @@
+ <example>
+ git commit -m 'Commit message here.
+ 
+-👾 Generated with [Letta Code](https://letta.com)
+-
+-Co-Authored-By: Letta Code <noreply@letta.com>'
++Additional context here.'
+ </example>
+ 
+ Use single quotes (not double quotes) and do NOT wrap the message in `$(...)` or backticks — single-quoting preserves the message verbatim (including `$VAR`, backticks, and other special characters) without needing escapes.
+@@ -114,9 +109,7 @@
+ <1-3 bullet points>
+ 
+ ## Test plan
+-[Bulleted markdown checklist of TODOs for testing the pull request...]
+-
+-👾 Generated with [Letta Code](https://letta.com)'
++[Bulleted markdown checklist of TODOs for testing the pull request...]'
+ </example>
+ 
+ Important:
+--- a/src/tools/descriptions/ExecCommand.md
++++ b/src/tools/descriptions/ExecCommand.md
+@@ -30,10 +30,7 @@
+   - Ensure it accurately reflects the changes and their purpose
+ 3. Run the following commands:
+    - Add relevant untracked files to the staging area.
+-   - Create the commit with a message ending with:
+-   👾 Generated with [Letta Code](https://letta.com)
+-
+-   Co-Authored-By: Letta Code <noreply@letta.com>
++   - Create the commit with the drafted message.
+    - Run git status after the commit completes to verify success.
+    Note: git status depends on the commit completing, so run it sequentially after the commit.
+ 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
+@@ -48,9 +45,7 @@
+ <example>
+ git commit -m 'Commit message here.
+ 
+-👾 Generated with [Letta Code](https://letta.com)
+-
+-Co-Authored-By: Letta Code <noreply@letta.com>'
++Additional context here.'
+ </example>
+ 
+ Use single quotes (not double quotes) and do NOT wrap the message in `$(...)` or backticks — single-quoting preserves the message verbatim (including `$VAR`, backticks, and other special characters) without needing escapes.
+--- a/src/tools/descriptions/Shell.md
++++ b/src/tools/descriptions/Shell.md
+@@ -26,10 +26,7 @@
+   - Ensure it accurately reflects the changes and their purpose
+ 3. Run the following commands:
+    - Add relevant untracked files to the staging area.
+-   - Create the commit with a message ending with:
+-   👾 Generated with [Letta Code](https://letta.com)
+-
+-   Co-Authored-By: Letta Code <noreply@letta.com>
++   - Create the commit with the drafted message.
+    - Run git status after the commit completes to verify success.
+    Note: git status depends on the commit completing, so run it sequentially after the commit.
+ 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
+@@ -44,9 +41,7 @@
+ <example>
+ git commit -m 'Commit message here.
+ 
+-👾 Generated with [Letta Code](https://letta.com)
+-
+-Co-Authored-By: Letta Code <noreply@letta.com>'
++Additional context here.'
+ </example>
+ 
+ Use single quotes (not double quotes) and do NOT wrap the message in `$(...)` or backticks — single-quoting preserves the message verbatim (including `$VAR`, backticks, and other special characters) without needing escapes.
+@@ -71,9 +66,7 @@
+ <1-3 bullet points>
+ 
+ ## Test plan
+-[Bulleted markdown checklist of TODOs for testing the pull request...]
+-
+-👾 Generated with [Letta Code](https://letta.com)'
++[Bulleted markdown checklist of TODOs for testing the pull request...]'
+ </example>
+ 
+ Important:
+--- a/src/tools/descriptions/ShellCommand.md
++++ b/src/tools/descriptions/ShellCommand.md
+@@ -26,10 +26,7 @@
+   - Ensure it accurately reflects the changes and their purpose
+ 3. Run the following commands:
+    - Add relevant untracked files to the staging area.
+-   - Create the commit with a message ending with:
+-   👾 Generated with [Letta Code](https://letta.com)
+-
+-   Co-Authored-By: Letta Code <noreply@letta.com>
++   - Create the commit with the drafted message.
+    - Run git status after the commit completes to verify success.
+    Note: git status depends on the commit completing, so run it sequentially after the commit.
+ 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
+@@ -44,9 +41,7 @@
+ <example>
+ git commit -m 'Commit message here.
+ 
+-👾 Generated with [Letta Code](https://letta.com)
+-
+-Co-Authored-By: Letta Code <noreply@letta.com>'
++Additional context here.'
+ </example>
+ 
+ Use single quotes (not double quotes) and do NOT wrap the message in `$(...)` or backticks — single-quoting preserves the message verbatim (including `$VAR`, backticks, and other special characters) without needing escapes.
+@@ -71,9 +66,7 @@
+ <1-3 bullet points>
+ 
+ ## Test plan
+-[Bulleted markdown checklist of TODOs for testing the pull request...]
+-
+-👾 Generated with [Letta Code](https://letta.com)'
++[Bulleted markdown checklist of TODOs for testing the pull request...]'
+ </example>
+ 
+ Important:
+--- a/src/tools/descriptions/RunShellCommandGemini.md
++++ b/src/tools/descriptions/RunShellCommandGemini.md
+@@ -36,10 +36,7 @@
+   - Ensure it accurately reflects the changes and their purpose
+ 3. Run the following commands:
+    - Add relevant untracked files to the staging area.
+-   - Create the commit with a message ending with:
+-   👾 Generated with [Letta Code](https://letta.com)
+-
+-   Co-Authored-By: Letta Code <noreply@letta.com>
++   - Create the commit with the drafted message.
+    - Run git status after the commit completes to verify success.
+    Note: git status depends on the commit completing, so run it sequentially after the commit.
+ 4. If the commit fails due to pre-commit hook: fix the issue and create a NEW commit
+@@ -54,9 +51,7 @@
+ <example>
+ git commit -m 'Commit message here.
+ 
+-👾 Generated with [Letta Code](https://letta.com)
+-
+-Co-Authored-By: Letta Code <noreply@letta.com>'
++Additional context here.'
+ </example>
+ 
+ Use single quotes (not double quotes) and do NOT wrap the message in `$(...)` or backticks — single-quoting preserves the message verbatim (including `$VAR`, backticks, and other special characters) without needing escapes.
+@@ -81,9 +76,7 @@
+ <1-3 bullet points>
+ 
+ ## Test plan
+-[Bulleted markdown checklist of TODOs for testing the pull request...]
+-
+-👾 Generated with [Letta Code](https://letta.com)'
++[Bulleted markdown checklist of TODOs for testing the pull request...]'
+ </example>
+ 
+ Important:
