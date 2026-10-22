@@ -20,6 +20,18 @@ in
     <home-manager/nixos>
   ];
 
+  # Distrust compromised intermediates chaining to this root (Mozilla bug 2083449).
+  security.pki.caCertificateBlacklist = [
+    "Comodo AAA Services root"
+    "emSign ECC Root CA - G3"
+  ];
+
+  # Set trust paths at login for desktop apps as well as terminal processes.
+  environment.sessionVariables = {
+    SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
+    NIX_SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
+  };
+
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -203,6 +215,7 @@ in
     ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4gDlyPtlzJJ5IvuQXSaB3d8uhOrpTYUzon+CLHqPIM philipp.krueger1@gmail.com"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILBpGNJCiAT2fYCZjVKHlnubTqUIpGWMRQiOdtC05kUy browser"
     ];
   };
 
@@ -215,6 +228,8 @@ in
 
   # Install firefox.
   programs.firefox.enable = true;
+  programs.firefox.package =
+    (import <nixos-unstable> { config = pkgs.config; }).firefox;
 
   # Install adb
   programs.adb.enable = true;

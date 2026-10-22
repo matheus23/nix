@@ -7,6 +7,7 @@
 
 let
   unstable = import <nixos-unstable> { config = config.nixpkgs.config; };
+  secureNode = import ../custom/nodejs-security.nix { pkgs = unstable; };
 
   signingPubKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII4oFL+qMOmADJ+KGZwQ13Ma65zcEcXuF4JYjNrjvIr5 nixos git commit signing for philipp.krueger1@gmail.com";
 
@@ -21,7 +22,9 @@ let
 
   kache = pkgs.callPackage ../custom/kache/package.nix { };
 
-  letta-code = pkgs.callPackage ../custom/letta-code/package.nix { };
+  letta-code = pkgs.callPackage ../custom/letta-code/package.nix {
+    nodejs_22 = secureNode.nodejs_22;
+  };
 
   pigeons = pkgs.callPackage ../custom/pigeons/package.nix { };
 
@@ -110,6 +113,7 @@ in
 
   programs.firefox = {
     enable = true;
+    package = unstable.firefox;
   };
 
   programs.obs-studio = {
@@ -131,9 +135,9 @@ in
     (unstable.spotify.override { deviceScaleFactor = 2; })
     pkgs.discord
     pkgs.zoom-us
-    pkgs.chromium
+    unstable.chromium
     pkgs.yarn
-    pkgs.nodejs_24
+    secureNode.nodejs_24
     pkgs.nixfmt-rfc-style
     pkgs.neofetch # for fun (prints system info)
     pkgs.obsidian
@@ -218,7 +222,9 @@ in
     pkgs.cmake
     pkgs.go
 
-    unstable.pi-coding-agent
+    (unstable.pi-coding-agent.override {
+      buildNpmPackage = unstable.buildNpmPackage.override { nodejs = secureNode.nodejs_24; };
+    })
     (pkgs.callPackage ../custom/btrfs-snap-scrub/package.nix { })
     (pkgs.callPackage ../custom/lmstudio/package.nix { })
     letta-code
