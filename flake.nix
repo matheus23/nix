@@ -2,7 +2,7 @@
   description = "flakes";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-25.11";
+    nixpkgs.url = "nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
     # fixes https://github.com/NixOS/nixpkgs/issues/298285
     # using nixpkgs from that branch until it's merged

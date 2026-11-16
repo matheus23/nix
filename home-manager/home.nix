@@ -9,12 +9,19 @@ let
   unstable = import <nixos-unstable> { config = config.nixpkgs.config; };
   secureNode = import ../custom/nodejs-security.nix { pkgs = unstable; };
 
+  # Requests must use the NixOS CA exclusions, including when the GUI starts the daemon.
+  withSystemCAs = package: package.overridePythonAttrs (old: {
+    makeWrapperArgs = (old.makeWrapperArgs or [ ]) ++ [
+      "--set" "REQUESTS_CA_BUNDLE" "/etc/ssl/certs/ca-certificates.crt"
+      "--set" "NIX_SSL_CERT_FILE" "/etc/ssl/certs/ca-certificates.crt"
+    ];
+  });
+
   signingPubKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII4oFL+qMOmADJ+KGZwQ13Ma65zcEcXuF4JYjNrjvIr5 nixos git commit signing for philipp.krueger1@gmail.com";
 
   sessionPath = [
     "$HOME/.local/bin"
     "$HOME/.cargo/bin"
-    "/home/philipp/.deno/bin"
     "$PATH"
   ];
 
@@ -139,7 +146,7 @@ in
     pkgs.yarn
     secureNode.nodejs_24
     pkgs.nixfmt-rfc-style
-    pkgs.neofetch # for fun (prints system info)
+    # pkgs.fastfetch # for fun (prints system info)
     pkgs.obsidian
     pkgs.yq
     pkgs.jq
@@ -149,8 +156,6 @@ in
     pkgs.elmPackages.elm
     unstable.signal-desktop # we need unstable for the latest version, so it actually works.
     pkgs.steam-run
-    pkgs.deno
-    pkgs.slack
     pkgs.cargo-nextest
     pkgs.cargo-audit
     pkgs.cargo-deny
@@ -161,7 +166,7 @@ in
     pkgs.cargo-bloat
     pkgs.cargo-make
     pkgs.cargo-watch
-    pkgs.cargo-release
+    unstable.cargo-release
     pkgs.cargo-semver-checks
     unstable.cargo-outdated
     kache
@@ -182,13 +187,12 @@ in
     pkgs.nix-index
     unstable.rust-analyzer
     pkgs.direnv
-    pkgs.maestral
-    pkgs.maestral-gui
+    (withSystemCAs pkgs.maestral)
+    (withSystemCAs pkgs.maestral-gui)
     pkgs.lnav # this is really a pretty decent log viewer
     pkgs.git-filter-repo
     pkgs.tmux
     unstable.zed-editor
-    # unstable.claude-code # fails build currently
     # these two are useful for building the openssl-sys rust crate, which is used in many places
     pkgs.openssl
     pkgs.pkg-config
@@ -203,9 +207,12 @@ in
     pkgs.nftables
 
     # (pkgs.callPackage ../custom/opencode/package.nix { }) # seems to be broken on some download
-    unstable.opencode
+    # Disabled at 2.0.32 pending verified October 2026 CA/runtime fixes.
+    # Fixed OpenCode version: not yet established; verify its bundled runtime before re-enabling.
+    # unstable.opencode
     unstable.nono # sandbox for agents
-    (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
+    # Re-enable alongside OpenCode.
+    # (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
 
     (pkgs.writeShellApplication {
       name = "ssh-laptop";
@@ -226,7 +233,6 @@ in
       buildNpmPackage = unstable.buildNpmPackage.override { nodejs = secureNode.nodejs_24; };
     })
     (pkgs.callPackage ../custom/btrfs-snap-scrub/package.nix { })
-    (pkgs.callPackage ../custom/lmstudio/package.nix { })
     letta-code
     (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks

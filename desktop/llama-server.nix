@@ -13,6 +13,8 @@ let
     }).overrideAttrs
       (old: {
         version = "0-unstable-2026-09-30-qwen4exp-direct-rows";
+        # Match the UI dependencies to the pinned source rather than nixpkgs' revision.
+        npmDepsHash = "sha256-2Q7XhaLAArmviOLdQsNbYTfdyDE5pW9lR26cRHEVl9k=";
         src = pkgs.fetchzip {
           url = "https://github.com/ggml-org/llama.cpp/archive/db00347a4b33393bf53986e976fe8505bbf92665.tar.gz";
           hash = "sha256-ylyKUAGCRC43328I6p5kW2o2BUOZLkmg+TEXxdTi9Tw=";

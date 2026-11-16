@@ -23,7 +23,6 @@ in
   # Distrust compromised intermediates chaining to this root (Mozilla bug 2083449).
   security.pki.caCertificateBlacklist = [
     "Comodo AAA Services root"
-    "emSign ECC Root CA - G3"
   ];
 
   # Set trust paths at login for desktop apps as well as terminal processes.
@@ -36,6 +35,13 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.kernelPackages = pkgs.linuxPackages_6_18; # needed to fix WiFi driver not advertising P2P-device
+
+  # Expand GPU-visible memory to 124 GiB for large ROCm models on Strix Halo.
+  boot.kernelParams = [
+    "amdgpu.gttsize=126976"
+    "ttm.pages_limit=32505856"
+    "ttm.page_pool_size=32505856"
+  ];
 
   # Keep /nix/store outside snapper's root snapshots. NixOS applies the public
   # read-only store bind from boot.nixStoreMountOpts; the daemon keeps its private
@@ -89,6 +95,11 @@ in
   # Configure console keymap
   console.keyMap = "de";
 
+  # Set shell history to append instead of replace
+  programs.bash.interactiveShellInit = ''
+    shopt -s histappend
+  '';
+
   # Enable CUPS to print documents.
   services.printing.enable = true;
 
@@ -122,68 +133,6 @@ in
     };
   };
 
-  # Give Ava a private point-to-point network. The host-side proxy below is
-  # the only service exposed on this link; the firewall rejects every other
-  # packet arriving from the container, including connections to host-wide
-  # services such as SSH.
-  containers.ava = {
-    autoStart = true;
-    privateNetwork = true;
-    hostAddress = "10.231.137.1";
-    localAddress = "10.231.137.2";
-    config =
-      { config, pkgs, ... }:
-      {
-        users.users.ava = {
-          isNormalUser = true;
-          shell = pkgs.bashInteractive;
-        };
-
-        environment.systemPackages = with pkgs; [
-          bashInteractive
-          coreutils
-          curl
-          git
-        ];
-
-        environment.variables.LLAMA_SERVER_URL = "http://10.231.137.1:8422";
-
-        system.stateVersion = "25.11";
-      };
-  };
-
-  # llama-server deliberately remains bound to host loopback. This proxy makes
-  # only its HTTP API reachable from Ava's private container link.
-  systemd.services.llama-server-ava-proxy = {
-    description = "Expose llama-server to the Ava container";
-    wants = [ "container@ava.service" ];
-    after = [ "container@ava.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "simple";
-      DynamicUser = true;
-      ExecStart = "${pkgs.socat}/bin/socat TCP-LISTEN:8422,bind=10.231.137.1,reuseaddr,fork TCP:127.0.0.1:8422";
-      NoNewPrivileges = true;
-      PrivateTmp = true;
-      ProtectHome = true;
-      ProtectSystem = "strict";
-      Restart = "on-failure";
-      RestartSec = 3;
-    };
-  };
-
-  # extraCommands is used because this host currently uses the iptables
-  # firewall backend. Insert these before the normal allow rules so the
-  # container cannot use globally allowed host ports.
-  networking.firewall.extraCommands = ''
-    iptables -I nixos-fw 1 -i ve-ava -p tcp -d 10.231.137.1 --dport 8422 -j nixos-fw-accept
-    iptables -I nixos-fw 2 -i ve-ava -j nixos-fw-refuse
-  '';
-  networking.firewall.extraStopCommands = ''
-    iptables -D nixos-fw -i ve-ava -p tcp -d 10.231.137.1 --dport 8422 -j nixos-fw-accept || true
-    iptables -D nixos-fw -i ve-ava -j nixos-fw-refuse || true
-  '';
-
   systemd.tmpfiles.rules = [
     "d /var/lib/wbo 0750 1000 1000 -"
   ];
@@ -202,7 +151,7 @@ in
     ];
     packages = with pkgs; [
       home-manager
-      rustup
+      (import <nixos-unstable> { config = pkgs.config; }).rustup
       wget
       curl
       gnome-tweaks
@@ -216,6 +165,7 @@ in
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4gDlyPtlzJJ5IvuQXSaB3d8uhOrpTYUzon+CLHqPIM philipp.krueger1@gmail.com"
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILBpGNJCiAT2fYCZjVKHlnubTqUIpGWMRQiOdtC05kUy browser"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEnU+OsWjdqZ0JnF1r8aAIjSsbKkX2XYDUcyvbOk7vr0 fairphone"
     ];
   };
 
@@ -231,15 +181,13 @@ in
   programs.firefox.package =
     (import <nixos-unstable> { config = pkgs.config; }).firefox;
 
-  # Install adb
-  programs.adb.enable = true;
-
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
+    android-tools
     snapper-gui
     socat
     bubblewrap
@@ -309,9 +257,6 @@ in
   '';
 
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [
-    1234 # lmstudio
-  ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
