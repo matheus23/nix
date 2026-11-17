@@ -37,6 +37,11 @@ let
 
 in
 {
+  imports = [
+    ./discord-archive.nix
+    ./nono-shell.nix
+  ];
+
   home.username = "philipp";
   home.homeDirectory = "/home/philipp";
   home.stateVersion = "22.11";
@@ -140,7 +145,7 @@ in
   home.packages = [
     _1password
     (unstable.spotify.override { deviceScaleFactor = 2; })
-    unstable.discord
+    # Discord itself comes from ./discord-archive.nix, wired to the gateway tap.
     pkgs.zoom-us
     unstable.chromium
     pkgs.yarn
@@ -237,6 +242,8 @@ in
     (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
+    (unstable.callPackage ../custom/claude-desktop/package.nix { })
+    unstable.goose-desktop
 
     # two nix language servers that help with getting zed nix integration going
     pkgs.nil

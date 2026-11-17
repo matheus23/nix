@@ -180,6 +180,9 @@ in
   # enable nix flakes
   nix.settings.experimental-features = "nix-command flakes";
 
+  # Claude Desktop downloads its own Claude Code executables after installation.
+  programs.nix-ld.enable = true;
+
   # Install firefox.
   programs.firefox.enable = true;
   programs.firefox.package =

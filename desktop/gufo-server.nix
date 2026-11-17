@@ -3,12 +3,10 @@
 let
   # Pin the Gufo source independently of this repository's nixpkgs. Gufo's
   # flake carries the ROCm toolchain it qualifies for Strix Halo.
-  gufoFlake = builtins.getFlake "github:gufo-org/gufo/e03bb9115abc6be469927fed76fddaf1ef0682b3";
-  # Local patch: Gufo hard-codes 16 images per chat request. Agent clients
-  # re-send retained screenshots every turn, so a low cap fails every later
-  # request while the context still has room and compaction never runs. The
-  # patch raises the count and image-byte budget to 128 images; the
-  # maxRequestBytes below is the HTTP-body side of the same change.
+  gufoFlake = builtins.getFlake "github:gufo-org/gufo/2845939b2a7d61243d407c8816c6d42652512e50"; # v0.34.0
+  # Agent clients re-send retained screenshots on every turn. Keep a 256 MiB
+  # decoded-image budget; maxRequestBytes below covers the base64 HTTP body.
+  # Remove the patch when upstream allows configuring this budget.
   gufo = gufoFlake.packages.${pkgs.system}.default.overrideAttrs (
     _final: prev: { patches = (prev.patches or [ ]) ++ [ ./gufo-image-limit.patch ]; }
   );
@@ -17,21 +15,19 @@ let
     host = "127.0.0.1";
     port = 8422;
     sessions = 2;
-    model = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
+    model = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/f5d175de2cf7f720d45d6064019a81fcf056e986/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
     servedModelName = "qwen3.8-flash-next-q4";
     context = 262144;
     speculative = "mtp";
-    mtpModel = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf";
-    draftTokens = 7;
-    minDraftTokens = 1;
+    mtpModel = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/f5d175de2cf7f720d45d6064019a81fcf056e986/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf";
     think = "on";
     reasoningEffort = "high";
     preserveThinking = "on";
     cacheDisk = "/var/lib/gufo/cache";
     cacheDiskBytes = 8589934592;
     cacheDiskStagingBytes = 8589934592;
-    # Base64 payloads for the patched 128-image request budget (256 MiB
-    # decoded) do not fit the 8 MiB default HTTP body limit.
+    # Base64 payloads for the patched 256 MiB decoded-image budget do not fit
+    # the default HTTP body limit.
     maxRequestBytes = 512 * 1024 * 1024;
     extraArgs = [ "--log-progress" ];
   };

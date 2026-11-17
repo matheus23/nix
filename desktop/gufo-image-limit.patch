@@ -1,35 +1,12 @@
-diff --git a/src/cli/serve/openai_chat.cpp b/src/cli/serve/openai_chat.cpp
-index 4b63e7c..2731e4f 100644
---- a/src/cli/serve/openai_chat.cpp
-+++ b/src/cli/serve/openai_chat.cpp
-@@ -261,9 +261,9 @@ bool ParseContent(const json::Value* content,
-       const auto* url =
-           image != nullptr && image->is_object() ? image->find("url") : nullptr;
-       if (message->role != tokenization::ChatRole::kUser || url == nullptr ||
--          !url->is_string() || message->images.size() >= 16) {
-+          !url->is_string() || message->images.size() >= 128) {
-         *error =
--            "image_url requires a user message and a string URL (at most 16 "
-+            "image_url requires a user message and a string URL (at most 128 "
-             "images)";
-         return false;
-       }
 diff --git a/src/core/image.hpp b/src/core/image.hpp
-index 20b3d46..5513644 100644
 --- a/src/core/image.hpp
 +++ b/src/core/image.hpp
-@@ -28,8 +28,12 @@ struct Image {
-     const std::filesystem::path& path);
- /// Shared across all messages of one HTTP request.
- struct ImageReadBudget {
+@@ -31,7 +31,7 @@ struct ImageReadBudget {
+   /// False when the loaded model takes no image input; reading is refused
+   /// before any data URL is decoded or any URL is fetched.
+   bool accepts_images{true};
 -  std::size_t remaining_bytes{kMaxEncodedImageBytes};
--  std::size_t remaining_images{16};
-+  // Local build: agent clients re-send retained screenshots on every turn,
-+  // so a small count limit fails whole sessions long before the context is
-+  // full. Budget 128 images averaging 2 MiB decoded; the HTTP body limit is
-+  // raised to match in the Nix service (--max-request-bytes).
 +  std::size_t remaining_bytes{256 * 1024 * 1024};
-+  std::size_t remaining_images{128};
    std::chrono::steady_clock::time_point deadline{
        std::chrono::steady_clock::now() + std::chrono::seconds(15)};
  };

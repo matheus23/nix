@@ -40,9 +40,9 @@ let
           ];
       });
 
-  modelDir = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/824f539b2710e5a9e47af4952cf6578cf5ee8932";
+  modelDir = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3.8-Flash-Next-GGUF/f5d175de2cf7f720d45d6064019a81fcf056e986";
   target = "${modelDir}/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf";
-  mmproj = "${modelDir}/mmproj-F16.gguf";
+  mmproj = "${modelDir}/mmproj-BF16.gguf";
   llama32Target = "/home/philipp/.lmstudio/models/unsloth/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf";
   qwen3Target = "/home/philipp/.local/share/models/huggingface/unsloth/Qwen3-0.6B-GGUF/50968a4468ef4233ed78cd7c3de230dd1d61a56b/Qwen3-0.6B-UD-Q6_K_XL.gguf";
   slotSavePath = "/home/philipp/.cache/ava/slots";
