@@ -140,7 +140,7 @@ in
   home.packages = [
     _1password
     (unstable.spotify.override { deviceScaleFactor = 2; })
-    pkgs.discord
+    unstable.discord
     pkgs.zoom-us
     unstable.chromium
     pkgs.yarn

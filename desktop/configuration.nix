@@ -135,6 +135,10 @@ in
 
   systemd.tmpfiles.rules = [
     "d /var/lib/wbo 0750 1000 1000 -"
+    # Separate subvolumes keep downloaded weights out of home snapshots.
+    # Existing ordinary directories must be migrated manually first.
+    "v /home/philipp/.local/share/models 0755 philipp users -"
+    "v /home/philipp/.lmstudio/models 0755 philipp users -"
   ];
 
   # Enable touchpad support (enabled default in most desktopManager).

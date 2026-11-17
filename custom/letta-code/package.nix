@@ -1,69 +1,101 @@
 {
   lib,
-  buildNpmPackage,
+  stdenv,
   fetchFromGitHub,
   nodejs_22,
   bun,
+  cacert,
   git,
   ripgrep,
   makeWrapper,
+  python3,
 }:
 
-buildNpmPackage rec {
-  pname = "letta-code";
-  version = "0.31.12-pr4237";
-
+let
+  version = "0.34.63";
   src = fetchFromGitHub {
     owner = "letta-ai";
     repo = "letta-code";
-    rev = "2df34493575dfdf8293e8fa9666509af9980a02a";
-    hash = "sha256-aOVCOhzONY4GM5PSl8JmRoRsT5GtWraLebdwhz3klzI=";
+    rev = "eadef1c6c3594d1bf81517efd4b68fce54644ad4";
+    hash = "sha256-OLVW/kSyECnsJTd8MBrSffLv/jWuH/aQDfcAJlnsKJU=";
   };
 
-  # The directory input is unpacked below the standard `source` directory.
-  sourceRoot = "source";
+  # buildNpmPackage's offline-cache conversion cannot represent this release's
+  # dependency graph. Install from the pinned lock in a fixed-output derivation
+  # instead; its recursive hash keeps the result reproducible.
+  npmDeps = stdenv.mkDerivation {
+    pname = "letta-code-npm-deps";
+    inherit version src;
+    nativeBuildInputs = [
+      nodejs_22
+      cacert
+    ];
+    SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
+
+    buildPhase = ''
+      runHook preBuild
+      export HOME="$TMPDIR" npm_config_cache="$TMPDIR/npm-cache"
+      cp ${./package-lock.json} package-lock.json
+      npm_config_fetch_retries=0 npm_config_fetch_timeout=30000 \
+        npm install --ignore-scripts --legacy-peer-deps \
+          --no-audit --no-fund
+      runHook postBuild
+    '';
+    installPhase = ''
+      mkdir -p "$out"
+      cp -a node_modules "$out/"
+    '';
+
+    # Fixed-output derivations must not acquire references when Nix fixes up
+    # scripts inside node_modules.
+    dontPatchShebangs = true;
+    dontFixup = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+    outputHash = "sha256-ost2Vki4+6cEMbejNywHT6SlOuuEC/qSlqXUpiMrqlY=";
+  };
+in
+stdenv.mkDerivation {
+  pname = "letta-code";
+  inherit version src;
 
   # Recover turns when a local provider rejects the per-request image COUNT
   # (e.g. Gufo's HTTP 400 "at most 16 images") by eliding oldest images from
-  # the provider retry context, instead of permanently bricking the session.
-  # Remove this patch once upstream ships an equivalent fix
-  # (letta-ai/letta-code: reactive elision exists for byte-size, not count).
+  # the provider retry context. Remove when upstream supports count limits.
   patches = [
     ./local-image-count-recovery.patch
-    # Keep commit and PR messages free of co-author Letta attribution stuff.
-    ./no-generated-attribution.patch
+    # Keep commit and PR messages free of automated Letta attribution.
+    ./no-generated-attribution-03463.patch
   ];
 
-  # The repository uses Bun's lockfile, while buildNpmPackage uses npm. Vendor
-  # an npm lockfile generated from this exact source revision.
-  # Remove the prepare script because it installs Git hooks during the build.
-  postPatch = ''
-    cp ${./package-lock.json} package-lock.json
-    sed -i '\|"prepare": "node .husky/install.mjs"|d' package.json
+  nativeBuildInputs = [
+    bun
+    nodejs_22
+    makeWrapper
+    python3
+  ];
+  buildPhase = ''
+    export HOME="$TMPDIR" npm_config_cache="$TMPDIR/npm-cache"
+    cp -a ${npmDeps}/node_modules .
+    chmod -R u+w node_modules
+    # Lifecycle scripts are disabled in the dependency fetch. Build the PTY
+    # addon here with Nix's compiler and Node headers, without network access.
+    npm rebuild node-pty --offline --nodedir=${nodejs_22}
+    node scripts/postinstall-patches.js
+    # Avoid bunx's network/cache lookup inside the Nix build.
+    sed -i 's|bunx tsc|node node_modules/typescript/bin/tsc|' build.js
+    bun run build.js
   '';
-
-  npmDepsHash = "sha256-2AqFuI5pRaBppMKbobvAHdLUMZ7Kjx4K1hgDU2Y9LVk=";
-  npmBuildScript = "build";
-
-  # react@18.2.0 conflicts with @pierre/diffs' peer dep (^18.3.1 || ^19.0.0)
-  npmFlags = [ "--legacy-peer-deps" ];
-
-  # Avoid running package scripts while npm inspects the source archive.
-  npmPackFlags = [ "--ignore-scripts" ];
-
-  nodejs = nodejs_22;
-
-  nativeBuildInputs = [ bun makeWrapper ];
-
-  # The CLI shells out to git and ripgrep at runtime
-  postInstall = ''
-    wrapProgram $out/bin/letta \
-      --prefix PATH : ${
-        lib.makeBinPath [
-          git
-          ripgrep
-        ]
-      }
+  installPhase = ''
+    package="$out/lib/node_modules/@letta-ai/letta-code"
+    mkdir -p "$package" "$out/bin"
+    cp -a \
+      letta.js image-resize.js image-resize-worker.js cursor-worker.js \
+      dist assets docs skills vendor package.json node_modules \
+      "$package/"
+    makeWrapper ${nodejs_22}/bin/node "$out/bin/letta" \
+      --add-flags "$package/letta.js" \
+      --prefix PATH : ${lib.makeBinPath [ git ripgrep ]}
   '';
 
   meta = {

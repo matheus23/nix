@@ -1,0 +1,31 @@
+--- a/src/tools/descriptions/Bash.md
++++ b/src/tools/descriptions/Bash.md
+@@ -14,11 +14,10 @@
+ - Use the `gh` CLI for GitHub operations (PRs, issues, API).
+ - GitHub notifies the owner of any `@name` written in a PR, issue, or comment. Write a bare `@name` only for a real login you mean to notify. Put roles, placeholders, and code (`@human`, `@reviewer`, `@types/node`) in backticks or drop the `@`.
+ - Commit or push only when the user asks. Do not amend, skip hooks, force-push, or run other destructive git commands unless the user asks; if a pre-commit hook fails, fix the issue and create a new commit.
+-- Pass commit messages and PR bodies as single-quoted strings with embedded newlines. Do not wrap them in `$(...)` or backticks. End commit messages with:
+-{{COMMIT_TRAILER}}
++- Pass commit messages and PR bodies as single-quoted strings with embedded newlines. Do not wrap them in `$(...)` or backticks. Do not add an automated attribution trailer to commit messages.
+ <example>
+ git commit -m 'Commit message here.
+ 
+-{{COMMIT_TRAILER}}'
++Additional context here.'
+ </example>
+ - Passing `gh pr checks` does not mean GitHub will merge the PR — unresolved review threads and still-pending required checks leave the merge state BLOCKED. If WatchPR is available and you will follow the PR toward merge, start it on the PR URL, and call the PR ready, green, or mergeable only once WatchPR reports it merge-ready.
+--- a/src/tools/descriptions/ExecCommand.md
++++ b/src/tools/descriptions/ExecCommand.md
+@@ -4,10 +4,9 @@
+ 
+ If a command is still running when this tool yields, you will receive a notification when it completes. Do not poll the session just to check whether it has finished. Use `write_stdin` only when you need to send input, interrupt the process, or obtain output before you can continue.
+ 
+-Git commits: commit only when the user asks. Do not amend, skip hooks, force-push, or run other destructive git commands unless the user asks; if a pre-commit hook fails, fix the issue and create a new commit. Pass the message as a single-quoted string with embedded newlines; do not wrap it in `$(...)` or backticks. End commit messages with:
+-{{COMMIT_TRAILER}}
++Git commits: commit only when the user asks. Do not amend, skip hooks, force-push, or run other destructive git commands unless the user asks; if a pre-commit hook fails, fix the issue and create a new commit. Pass the message as a single-quoted string with embedded newlines; do not wrap it in `$(...)` or backticks. Do not add an automated attribution trailer to commit messages.
+ <example>
+ git commit -m 'Commit message here.
+ 
+-{{COMMIT_TRAILER}}'
++Additional context here.'
+ </example>
