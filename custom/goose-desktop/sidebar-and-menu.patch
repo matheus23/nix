@@ -1,0 +1,51 @@
+--- a/desktop/src/components/Layout/AppLayout.tsx
++++ b/desktop/src/components/Layout/AppLayout.tsx
+@@ -115,7 +115,7 @@
+   }
+ 
+   const needsTrafficLightInset = safeIsMacOS && !isFullScreen;
+-  const headerPadding = needsTrafficLightInset ? 'pl-[96px]' : 'pl-4';
++  const headerPadding = needsTrafficLightInset ? 'pl-[96px]' : 'pl-[17px]';
+   const headerTop = needsTrafficLightInset ? 'top-[14px]' : 'top-[11px]';
+   const navToggleTitle = intl.formatMessage(
+     isNavExpanded ? i18n.collapseNavigation : i18n.openNavigation
+@@ -125,11 +125,11 @@
+     <div className="flex flex-1 w-full h-full relative animate-fade-in bg-background-primary flex-row">
+       <div
+         style={{ zIndex: Z_INDEX.HEADER }}
+-        className={cn('absolute flex items-center gap-1', headerPadding, headerTop, 'ml-1.5')}
++        className={cn('absolute flex items-center gap-1', headerPadding, headerTop)}
+       >
+         <Button
+           onClick={() => setIsNavExpanded(!isNavExpanded)}
+-          className="no-drag hover:!bg-background-tertiary"
++          className="no-drag size-11 p-0 has-[>svg]:px-0 hover:!bg-background-tertiary"
+           variant="ghost"
+           size="xs"
+           title={navToggleTitle}
+@@ -135,7 +135,7 @@
+           title={navToggleTitle}
+           aria-label={navToggleTitle}
+         >
+-          <PanelLeft className="w-5 h-5" />
++          <PanelLeft className="size-5" />
+         </Button>
+       </div>
+ 
+--- a/desktop/src/main.ts
++++ b/desktop/src/main.ts
+@@ -2778,6 +2778,14 @@
+     // English labels still succeed.
+     translateMenuLabels(menu.items);
+     Menu.setApplicationMenu(menu);
++    if (process.platform !== 'darwin') {
++      for (const window of BrowserWindow.getAllWindows()) {
++        window.setMenuBarVisibility(false);
++      }
++      app.on('browser-window-created', (_event, window) => {
++        window.setMenuBarVisibility(false);
++      });
++    }
+   }
+ 
+   app.on('activate', () => {

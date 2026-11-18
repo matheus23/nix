@@ -1,0 +1,63 @@
+--- a/desktop/src/components/ElicitationRequest.tsx
++++ b/desktop/src/components/ElicitationRequest.tsx
+@@ -3,6 +3,7 @@
+ import { defineMessages, useIntl } from '../i18n';
+ import { Button } from './ui/button';
+ import JsonSchemaForm from './ui/JsonSchemaForm';
++import MarkdownContent from './MarkdownContent';
+ import type { JsonSchema } from './ui/JsonSchemaForm';
+ 
+ const i18n = defineMessages({
+@@ -184,10 +185,8 @@
+ 
+   return (
+     <div className="flex flex-col">
+-      <div className="goose-message-content bg-background-secondary rounded-2xl rounded-b-none px-4 py-2 text-text-primary">
+-        <div className="flex justify-between items-start gap-4">
+-          <span>{message || intl.formatMessage(i18n.defaultMessage)}</span>
+-        </div>
++      <div className="goose-message-content min-w-0 bg-background-secondary rounded-2xl rounded-b-none px-4 py-3 text-text-primary">
++        <MarkdownContent content={message || intl.formatMessage(i18n.defaultMessage)} />
+       </div>
+       <div className="goose-message-content bg-background-primary border border-border-primary dark:border-gray-700 rounded-b-2xl px-4 py-3">
+         {hasSchemaFields ? (
+--- a/desktop/src/components/ToolCallWithResponse.tsx
++++ b/desktop/src/components/ToolCallWithResponse.tsx
+@@ -760,6 +760,18 @@
+ 
+   // Extract tool label content to avoid duplication
+   const getToolLabelContent = () => {
++    const toolName = getToolName(toolCall.name);
++    const command = toolCall.arguments?.command;
++    if ((toolName === 'shell' || toolName === 'exec') && typeof command === 'string') {
++      return (
++        <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full">
++          <span>running</span>
++          <code className="bg-inline-code font-mono rounded px-1 truncate min-w-0" dir="ltr">
++            {command}
++          </code>
++        </span>
++      );
++    }
+     const description = getToolDescription();
+     if (description) {
+       return description;
+--- a/desktop/src/components/ui/JsonSchemaForm.tsx
++++ b/desktop/src/components/ui/JsonSchemaForm.tsx
+@@ -44,6 +44,7 @@
+ 
+ interface JsonSchemaProperty {
+   type?: string;
++  title?: string;
+   description?: string;
+   default?: unknown;
+   enum?: string[];
+@@ -275,7 +276,7 @@
+         return (
+           <div key={key} className="flex flex-col gap-1">
+             <label htmlFor={key} className="text-sm font-medium text-text-primary">
+-              {key}
++              {prop.title || key}
+               {isRequired && <span className="text-red-500 ml-1">*</span>}
+             </label>
+             {prop.description && prop.type !== 'boolean' && (

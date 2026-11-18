@@ -118,7 +118,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       --add-flags "--disable-setuid-sandbox"
 
     substituteInPlace "$out/share/applications/com.anthropic.Claude.desktop" \
-      --replace-fail "Exec=claude-desktop" "Exec=$out/bin/claude-desktop"
+      --replace-fail "Exec=claude-desktop" "Exec=$out/bin/claude-desktop" \
+      --replace-fail "Icon=claude-desktop" \
+        "Icon=$out/share/icons/hicolor/256x256/apps/claude-desktop.png"
     runHook postInstall
   '';
 

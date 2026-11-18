@@ -1,0 +1,20 @@
+--- a/desktop/src/components/BaseChat.tsx
++++ b/desktop/src/components/BaseChat.tsx
+@@ -426,7 +426,7 @@
+ 
+   if (sessionLoadError) {
+     return (
+-      <div className="h-full flex flex-col min-h-0">
++      <div className="mx-auto h-full w-full max-w-5xl flex flex-col min-h-0 min-w-0">
+         <MainPanelLayout backgroundColor={'bg-background-primary'} removeTopPadding={true}>
+           <div className="flex flex-col flex-1 min-h-0 relative">
+             <div className="flex-1 flex items-center justify-center">
+@@ -454,7 +454,7 @@
+   }
+ 
+   return (
+-    <div className="h-full flex flex-col min-h-0">
++    <div className="mx-auto h-full w-full max-w-5xl flex flex-col min-h-0 min-w-0">
+       <MainPanelLayout backgroundColor={'bg-background-primary'} removeTopPadding={true}>
+         {/* Chat container with sticky recipe header */}
+         <div className="flex flex-col flex-1 min-h-0 relative">

@@ -1,0 +1,362 @@
+--- a/crates/goose/src/action_required_manager.rs
++++ b/crates/goose/src/action_required_manager.rs
+@@ -4,7 +4,7 @@
+ use std::sync::Arc;
+ use std::time::Duration;
+ use tokio::sync::{mpsc, Mutex, OwnedMutexGuard, RwLock};
+-use tokio::time::timeout;
++use tokio::time::{timeout, Instant};
+ use tracing::warn;
+ use uuid::Uuid;
+ 
+@@ -16,11 +16,13 @@
+ pub enum ElicitationOutcome {
+     Accept(Value),
+     Decline,
++    DeclineWithReason(String),
+     Cancel,
+ }
+ 
+ struct PendingRequest {
+     session_id: String,
++    deadline: Instant,
+     response_tx: Option<tokio::sync::oneshot::Sender<ElicitationOutcome>>,
+ }
+ 
+@@ -31,6 +33,12 @@
+ 
+ impl PendingResponseClaim {
+     pub(crate) fn submit(mut self, response: ElicitationOutcome) -> Result<()> {
++        if Instant::now() >= self.pending.deadline {
++            return Err(anyhow::anyhow!(
++                "Approval request expired: {}",
++                self.request_id
++            ));
++        }
+         let tx = self
+             .pending
+             .response_tx
+@@ -143,6 +151,7 @@
+         let (tx, rx) = tokio::sync::oneshot::channel();
+         let pending_request = PendingRequest {
+             session_id: session_id.clone(),
++            deadline: Instant::now() + timeout_duration,
+             response_tx: Some(tx),
+         };
+         let pending_request = Arc::new(Mutex::new(pending_request));
+@@ -172,6 +181,20 @@
+ 
+         self.pending.write().await.remove(&id);
+ 
++        if let Ok(ElicitationOutcome::DeclineWithReason(reason)) = &result {
++            let explanation = Message::user()
++                .with_content(MessageContent::Text(
++                    rmcp::model::TextContent::new(reason.clone()).with_annotations(
++                        rmcp::model::Annotations::default()
++                            .with_audience(vec![rmcp::model::Role::Assistant]),
++                    ),
++                ))
++                .agent_only();
++            if let Err(error) = sender.send(explanation).await {
++                warn!(%error, "Could not deliver elicitation denial explanation");
++            }
++        }
++
+         result
+     }
+ 
+@@ -192,6 +215,10 @@
+             ));
+         }
+ 
++        if Instant::now() >= pending.deadline {
++            return Err(anyhow::anyhow!("Approval request expired: {request_id}"));
++        }
++
+         let tx = pending
+             .response_tx
+             .as_ref()
+@@ -229,7 +256,12 @@
+                 if pending.response_tx.is_some() {
+                     pending.response_tx.take();
+                     warn!("Timeout waiting for response: {}", request_id);
+-                    return Err(anyhow::anyhow!("Timeout waiting for user response"));
++                    return Ok(ElicitationOutcome::DeclineWithReason(
++                        "Approval was denied because the request timed out after five minutes. \
++                         The human may be unavailable. Continue without this access if possible, \
++                         or end the turn explaining that human approval is needed."
++                            .to_string(),
++                    ));
+                 }
+                 drop(pending);
+ 
+@@ -489,7 +521,7 @@
+     }
+ 
+     #[tokio::test]
+-    async fn claimed_response_can_complete_after_timeout_deadline() {
++    async fn claimed_response_cannot_complete_after_timeout_deadline() {
+         let manager = Arc::new(ActionRequiredManager::new());
+         let mut action_required_rx = manager
+             .register_action_required_stream("session-a".to_string(), "tool-call-a".to_string())
+@@ -521,12 +553,18 @@
+ 
+         claim
+             .submit(ElicitationOutcome::Accept(json!({ "answer": "late" })))
+-            .unwrap();
++            .expect_err("expired claims must not grant access");
+ 
+-        assert_eq!(
++        assert!(matches!(
+             waiter.await.unwrap().unwrap(),
+-            ElicitationOutcome::Accept(json!({ "answer": "late" }))
+-        );
++            ElicitationOutcome::DeclineWithReason(_)
++        ));
++        let explanation = action_required_rx.recv().await.unwrap();
++        assert!(explanation
++            .as_concat_text()
++            .contains("human may be unavailable"));
++        assert!(explanation.user_visible_content().content.is_empty());
++        assert!(!explanation.agent_visible_content().content.is_empty());
+     }
+ 
+     #[tokio::test]
+@@ -647,16 +685,20 @@
+             .await;
+ 
+         for index in 0..ACTION_REQUIRED_STREAM_CAPACITY {
+-            let result = manager
+-                .request_and_wait(
+-                    "session-a".to_string(),
+-                    "tool-call-a".to_string(),
+-                    format!("Fill queue {index}"),
+-                    json!({ "type": "object" }),
+-                    Duration::ZERO,
+-                )
+-                .await;
+-            assert!(result.is_err());
++            manager
++                .action_required_senders
++                .lock()
++                .await
++                .get(&("session-a".to_string(), "tool-call-a".to_string()))
++                .unwrap()
++                .try_send(Message::assistant().with_content(
++                    MessageContent::action_required_elicitation(
++                        format!("queued-{index}"),
++                        "Need input".to_string(),
++                        json!({ "type": "object" }),
++                    ),
++                ))
++                .unwrap();
+         }
+ 
+         assert!(manager.pending.read().await.is_empty());
+--- a/crates/goose/src/elicitation.rs
++++ b/crates/goose/src/elicitation.rs
+@@ -9,14 +9,18 @@
+ fn elicitation_response_user_data(response: &ElicitationOutcome) -> Value {
+     match response {
+         ElicitationOutcome::Accept(user_data) => user_data.clone(),
+-        ElicitationOutcome::Decline | ElicitationOutcome::Cancel => serde_json::json!({}),
++        ElicitationOutcome::Decline
++        | ElicitationOutcome::DeclineWithReason(_)
++        | ElicitationOutcome::Cancel => serde_json::json!({}),
+     }
+ }
+ 
+ fn elicitation_response_action(response: &ElicitationOutcome) -> ElicitationAction {
+     match response {
+         ElicitationOutcome::Accept(_) => ElicitationAction::Accept,
+-        ElicitationOutcome::Decline => ElicitationAction::Decline,
++        ElicitationOutcome::Decline | ElicitationOutcome::DeclineWithReason(_) => {
++            ElicitationAction::Decline
++        }
+         ElicitationOutcome::Cancel => ElicitationAction::Cancel,
+     }
+ }
+--- a/crates/goose/src/agents/mcp_client.rs
++++ b/crates/goose/src/agents/mcp_client.rs
+@@ -428,7 +428,9 @@
+                 ElicitationOutcome::Accept(user_data) => {
+                     ElicitResult::new(ElicitationAction::Accept).with_content(user_data)
+                 }
+-                ElicitationOutcome::Decline => ElicitResult::new(ElicitationAction::Decline),
++                ElicitationOutcome::Decline | ElicitationOutcome::DeclineWithReason(_) => {
++                    ElicitResult::new(ElicitationAction::Decline)
++                }
+                 ElicitationOutcome::Cancel => ElicitResult::new(ElicitationAction::Cancel),
+             })
+             .map_err(|e| {
+--- a/crates/goose/src/agents/agent.rs
++++ b/crates/goose/src/agents/agent.rs
+@@ -1009,7 +1009,11 @@
+                     // server receives the user's accept/decline/cancel action.
+                     let response = match action {
+                         ElicitationAction::Accept => ElicitationOutcome::Accept(user_data.clone()),
+-                        ElicitationAction::Decline => ElicitationOutcome::Decline,
++                        ElicitationAction::Decline => user_data
++                            .get("goose_denial_reason")
++                            .and_then(|value| value.as_str())
++                            .map(|reason| ElicitationOutcome::DeclineWithReason(reason.to_string()))
++                            .unwrap_or(ElicitationOutcome::Decline),
+                         ElicitationAction::Cancel => ElicitationOutcome::Cancel,
+                         _ => ElicitationOutcome::Cancel,
+                     };
+--- a/crates/goose/src/agents/tool_execution.rs
++++ b/crates/goose/src/agents/tool_execution.rs
+@@ -1,4 +1,4 @@
+-use futures::{Stream, StreamExt};
++use futures::{FutureExt, Stream, StreamExt};
+ use rmcp::model::CallToolResult;
+ use std::future::Future;
+ use std::pin::Pin;
+@@ -140,6 +140,11 @@
+                     yield ToolStreamItem::Message(msg);
+                 }
+                 r = &mut done => {
++                    // A denial explanation can be queued immediately before the
++                    // tool finishes. Preserve it in the next inference too.
++                    while let Some(Some(msg)) = action_required_rx.next().now_or_never() {
++                        yield ToolStreamItem::ActionRequired(msg);
++                    }
+                     yield ToolStreamItem::Result(r);
+                     break;
+                 }
+@@ -162,3 +167,37 @@
+                                         If needed, adjust the explanation based on user preferences or questions.";
+ 
+ impl Agent {}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[tokio::test]
++    async fn action_required_manager_explanations_survive_tool_completion() {
++        let (tx, rx) = tokio::sync::mpsc::channel(1);
++        let done = async move {
++            tx.send(
++                Message::user()
++                    .with_text("No human is available.")
++                    .agent_only(),
++            )
++            .await
++            .unwrap();
++            Ok(CallToolResult::success(vec![]))
++        };
++        let mut stream = tool_stream(
++            futures::stream::pending(),
++            tokio_stream::wrappers::ReceiverStream::new(rx),
++            done,
++        );
++        assert!(matches!(
++            stream.next().await,
++            Some(ToolStreamItem::ActionRequired(_))
++        ));
++        assert!(matches!(
++            stream.next().await,
++            Some(ToolStreamItem::Result(_))
++        ));
++        assert!(stream.next().await.is_none());
++    }
++}
+--- a/crates/goose/src/acp/server/elicitation.rs
++++ b/crates/goose/src/acp/server/elicitation.rs
+@@ -214,12 +214,27 @@
+ }
+ 
+ fn elicitation_response_from_acp(response: CreateElicitationResponse) -> ElicitationOutcome {
++    let timed_out = serde_json::to_value(&response)
++        .ok()
++        .and_then(|value| {
++            value
++                .get("_meta")?
++                .get("goose.elicitationTimedOut")?
++                .as_bool()
++        })
++        .unwrap_or(false);
+     match response.action {
+         AcpElicitationAction::Accept(action) => {
+             let content = serde_json::to_value(action.content.unwrap_or_default())
+                 .unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()));
+             ElicitationOutcome::Accept(content)
+         }
++        AcpElicitationAction::Decline if timed_out => ElicitationOutcome::DeclineWithReason(
++            "Approval was denied because the request timed out after five minutes. \
++             The human may be unavailable. Continue without this access if possible, \
++             or end the turn explaining that human approval is needed."
++                .to_string(),
++        ),
+         AcpElicitationAction::Decline => ElicitationOutcome::Decline,
+         AcpElicitationAction::Cancel => ElicitationOutcome::Cancel,
+         action => {
+--- a/crates/goose/src/agents/state_machine/tests/calculator_extension.rs
++++ b/crates/goose/src/agents/state_machine/tests/calculator_extension.rs
+@@ -214,7 +214,7 @@
+                         params.value
+                     ))])
+                 }
+-                ElicitationOutcome::Decline => {
++                ElicitationOutcome::Decline | ElicitationOutcome::DeclineWithReason(_) => {
+                     CallToolResult::error(vec![ContentBlock::text("elicitation declined")])
+                 }
+                 ElicitationOutcome::Cancel => {
+--- a/crates/goose-cli/src/session/mod.rs
++++ b/crates/goose-cli/src/session/mod.rs
+@@ -1409,16 +1409,17 @@
+                                     break;
+                                 }
+                             } else if let Some((elicitation_id, elicitation_message, schema)) = find_elicitation_request(&message) {
+-                                if !interactive {
+-                                    // Non-interactive/headless mode: cannot collect user input
+-                                    tracing::warn!(
+-                                        "Elicitation requested in non-interactive mode, cancelling"
+-                                    );
+-                                    cancel_token_clone.cancel();
+-                                    drain_stopped_run(&mut stream, &mut self.messages, &mut last_usage).await;
+-                                    return Err(anyhow::anyhow!(
+-                                        "Elicitation requested but no interactive terminal is available to collect user input"
+-                                    ));
++                                if !interactive || !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
++                                    let response_message = Message::user()
++                                        .with_content(MessageContent::action_required_elicitation_response(
++                                            elicitation_id,
++                                            serde_json::json!({"goose_denial_reason": "Approval was denied because no human is available to approve this request in this non-interactive session. Continue without this access if possible, or end the turn explaining that human approval is needed."}),
++                                            ElicitationAction::Decline,
++                                        ))
++                                        .with_visibility(false, true);
++                                    self.messages.push(response_message.clone());
++                                    let _ = self.agent.reply(response_message, session_config.clone(), Some(cancel_token.clone())).await?;
++                                    continue;
+                                 }
+ 
+                                 output::hide_thinking();
+--- a/crates/goose/src/agents/state_machine/ops_toolcalling.rs
++++ b/crates/goose/src/agents/state_machine/ops_toolcalling.rs
+@@ -1102,7 +1102,23 @@
+         let (actions, response) = self.take_batch();
+         let response = response.ok_or_else(|| anyhow!("tool batch produced no responses"))?;
+         emit.emit(AgentEvent::Message(response.user_visible_content()));
+-        applied(actions.into_iter().chain([response]).map(GooseEffect::from))
++        // Put denial explanations after the tool responses, so provider message
++        // ordering still keeps every tool call adjacent to its results.
++        let (explanations, actions): (Vec<_>, Vec<_>) = actions.into_iter().partition(|message| {
++            message.role == Role::User
++                && !message.is_user_visible()
++                && message
++                    .content
++                    .iter()
++                    .all(|content| matches!(content, MessageContent::Text(_)))
++        });
++        applied(
++            actions
++                .into_iter()
++                .chain([response])
++                .chain(explanations)
++                .map(GooseEffect::from),
++        )
+     }
+ }
+ 

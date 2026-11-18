@@ -1,0 +1,76 @@
+--- a/desktop/src/components/ThinkingContent.tsx
++++ b/desktop/src/components/ThinkingContent.tsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect, useRef } from 'react';
++import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+ import MarkdownContent from './MarkdownContent';
+ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+ import Expand from './ui/Expand';
+@@ -21,6 +21,41 @@
+ 
+   const expanded = manualToggle !== null ? manualToggle : isExpanded;
+ 
++  const viewportRef = useRef<HTMLDivElement>(null);
++  const contentRef = useRef<HTMLDivElement>(null);
++  const following = useRef(true);
++  const [hasEarlierText, setHasEarlierText] = useState(false);
++
++  const followLatest = () => {
++    const viewport = viewportRef.current;
++    if (!viewport || !following.current) return;
++    viewport.scrollTop = viewport.scrollHeight;
++    setHasEarlierText(viewport.scrollTop > 0);
++  };
++
++  useLayoutEffect(() => {
++    if (!expanded) return;
++    following.current = true;
++    followLatest();
++    const observer = new ResizeObserver(followLatest);
++    if (contentRef.current) observer.observe(contentRef.current);
++    return () => observer.disconnect();
++    // Reopening the block starts at the newest text.
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [expanded]);
++
++  useLayoutEffect(() => {
++    followLatest();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [content, expanded]);
++
++  const handleScroll = () => {
++    const viewport = viewportRef.current;
++    if (!viewport) return;
++    following.current = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 2;
++    setHasEarlierText(viewport.scrollTop > 0);
++  };
++
+   return (
+     <Collapsible open={expanded} onOpenChange={(open) => setManualToggle(open)} className="mb-2">
+       <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+@@ -29,8 +64,23 @@
+         <span className="italic">Thinking</span>
+       </CollapsibleTrigger>
+       <CollapsibleContent>
+-        <div className="mt-1 ml-[18px] text-xs text-text-secondary italic">
+-          <MarkdownContent content={content} />
++        <div
++          ref={viewportRef}
++          role="region"
++          aria-label="Thinking"
++          tabIndex={0}
++          onScroll={handleScroll}
++          className="mt-1 ml-[18px] max-h-[200px] overflow-y-auto overscroll-contain text-xs text-text-secondary italic"
++          style={{
++            overflowAnchor: 'none',
++            maskImage: hasEarlierText
++              ? 'linear-gradient(to bottom, transparent, black 32px)'
++              : undefined,
++          }}
++        >
++          <div ref={contentRef}>
++            <MarkdownContent content={content} />
++          </div>
+         </div>
+       </CollapsibleContent>
+     </Collapsible>

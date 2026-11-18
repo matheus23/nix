@@ -1,0 +1,279 @@
+--- a/desktop/src/acp/elicitationRequests.ts
++++ b/desktop/src/acp/elicitationRequests.ts
+@@ -17,6 +17,7 @@
+   id: string;
+   sessionId: string;
+   request: SessionScopedFormElicitationRequest;
++  expiresAt?: number;
+ }
+ 
+ interface PendingElicitationRequest {
+@@ -39,6 +40,7 @@
+     id: `acp_elicitation_${uuidv7()}`,
+     sessionId: request.sessionId,
+     request,
++    expiresAt: Date.now() + ACP_ELICITATION_TIMEOUT_SECONDS * 1000,
+   };
+   const key = elicitationRequestKey(elicitationRequest.sessionId, elicitationRequest.id);
+ 
+@@ -49,21 +51,12 @@
+         return;
+       }
+ 
+-      pendingRequests.delete(key);
+-      acpChatSessionActions.setElicitationStatus(
+-        elicitationRequest.sessionId,
+-        elicitationRequest.id,
+-        'cancelled'
+-      );
+-      acpChatSessionActions.resolveUserInputRequest(
+-        elicitationRequest.sessionId,
+-        acpElicitationUserInputRequestId(elicitationRequest.id)
+-      );
+-      pending.resolve(cancelledElicitationResponse());
++      expireElicitation(key, pending);
+     }, ACP_ELICITATION_TIMEOUT_SECONDS * 1000);
+ 
+     pendingRequests.set(key, { request: elicitationRequest, resolve, timeoutId });
+     acpChatSessionActions.applyElicitationRequest(elicitationRequest);
++    void notifyElicitation();
+   });
+ }
+ 
+@@ -77,6 +70,10 @@
+   if (!pending) {
+     return false;
+   }
++  if (Date.now() >= pending.request.expiresAt!) {
++    expireElicitation(key, pending);
++    return false;
++  }
+ 
+   pendingRequests.delete(key);
+   clearTimeout(pending.timeoutId);
+@@ -89,6 +86,32 @@
+   return true;
+ }
+ 
++function expireElicitation(key: string, pending: PendingElicitationRequest): void {
++  pendingRequests.delete(key);
++  clearTimeout(pending.timeoutId);
++  const { sessionId, id } = pending.request;
++  acpChatSessionActions.setElicitationStatus(sessionId, id, 'expired');
++  acpChatSessionActions.resolveUserInputRequest(sessionId, acpElicitationUserInputRequestId(id));
++  pending.resolve({ action: 'decline', _meta: { 'goose.elicitationTimedOut': true } });
++}
++
++async function notifyElicitation(): Promise<void> {
++  try {
++    const [enabled, focused] = await Promise.all([
++      window.electron.getSetting('enableNotifications'),
++      window.electron.isAnyWindowFocused(),
++    ]);
++    if (enabled === true && !focused) {
++      window.electron.showNotification({
++        title: 'Goose needs your approval',
++        body: 'An extension is waiting for your response. The request expires after five minutes.',
++      });
++    }
++  } catch (error) {
++    console.warn('Could not notify about an elicitation request:', error);
++  }
++}
++
+ export function cancelAcpElicitationRequestsForSession(sessionId: string): void {
+   for (const [key, pending] of pendingRequests) {
+     if (pending.request.sessionId === sessionId) {
+--- a/desktop/src/acp/adapter/elicitations.ts
++++ b/desktop/src/acp/adapter/elicitations.ts
+@@ -7,7 +7,7 @@
+   messagesChange,
+ } from './shared';
+ 
+-export type ElicitationStatus = 'submitted' | 'cancelled';
++export type ElicitationStatus = 'submitted' | 'cancelled' | 'expired';
+ 
+ export function applyElicitationRequest(
+   state: AdapterState,
+@@ -29,6 +29,7 @@
+           id: request.id,
+           message: request.request.message,
+           requested_schema: request.request.requestedSchema,
++          expiresAt: request.expiresAt,
+         },
+       },
+     ],
+@@ -46,6 +47,7 @@
+   const statusData = {
+     isSubmitted: status === 'submitted',
+     isCancelled: status === 'cancelled',
++    isExpired: status === 'expired',
+   };
+   let changed = false;
+ 
+--- a/desktop/src/types/message.ts
++++ b/desktop/src/types/message.ts
+@@ -117,6 +117,8 @@
+     }
+   | {
+       actionType: 'elicitation';
++      expiresAt?: number;
++      isExpired?: boolean;
+       id: string;
+       message: string;
+       requested_schema: unknown;
+--- a/desktop/src/components/ElicitationRequest.tsx
++++ b/desktop/src/components/ElicitationRequest.tsx
+@@ -44,6 +44,7 @@
+ const ELICITATION_TIMEOUT_SECONDS = 300;
+ 
+ interface ElicitationRequestProps {
++  createdAt?: number;
+   isCancelledMessage: boolean;
+   isClicked: boolean;
+   actionRequiredContent: ActionRequired & { type: 'actionRequired' };
+@@ -57,6 +58,7 @@
+ }
+ 
+ export default function ElicitationRequest({
++  createdAt,
+   isCancelledMessage,
+   isClicked,
+   actionRequiredContent,
+@@ -68,6 +70,9 @@
+   const [submitError, setSubmitError] = useState<string | undefined>();
+   const [timeRemaining, setTimeRemaining] = useState(ELICITATION_TIMEOUT_SECONDS);
+   const startTimeRef = useRef(Date.now());
++  const deadline = actionRequiredContent.data.actionType === 'elicitation'
++    ? actionRequiredContent.data.expiresAt ?? (createdAt !== undefined ? createdAt * 1000 : startTimeRef.current) + ELICITATION_TIMEOUT_SECONDS * 1000
++    : Date.now();
+ 
+   useEffect(() => {
+     if (isClicked) {
+@@ -80,8 +85,7 @@
+     if (submitted || isCancelledMessage || isClicked) return;
+ 
+     const interval = setInterval(() => {
+-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+-      const remaining = Math.max(0, ELICITATION_TIMEOUT_SECONDS - elapsed);
++      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+       setTimeRemaining(remaining);
+ 
+       if (remaining === 0) {
+@@ -90,7 +94,7 @@
+     }, 1000);
+ 
+     return () => clearInterval(interval);
+-  }, [submitted, isCancelledMessage, isClicked]);
++  }, [submitted, isCancelledMessage, isClicked, deadline]);
+ 
+   if (actionRequiredContent.data.actionType !== 'elicitation') {
+     return null;
+@@ -102,6 +106,10 @@
+   const hasSchemaFields = Boolean(schema.properties && Object.keys(schema.properties).length > 0);
+ 
+   const submitResponse = async (formData: Record<string, unknown>) => {
++    if (Date.now() >= deadline) {
++      setTimeRemaining(0);
++      return;
++    }
+     setSubmitted(true);
+     setIsSubmitting(true);
+     setSubmitError(undefined);
+@@ -157,7 +165,7 @@
+   }
+ 
+   const isUrgent = timeRemaining <= 60;
+-  const isExpired = timeRemaining === 0;
++  const isExpired = timeRemaining === 0 || actionRequiredContent.data.isExpired || Date.now() >= deadline;
+ 
+   if (isExpired) {
+     return (
+--- a/desktop/src/components/GooseMessage.tsx
++++ b/desktop/src/components/GooseMessage.tsx
+@@ -212,6 +212,7 @@
+ 
+         {hasElicitation && submitElicitationResponse && (
+           <ElicitationRequest
++            createdAt={message.created}
+             isCancelledMessage={elicitationData?.isCancelled === true}
+             isClicked={elicitationData?.isSubmitted === true}
+             actionRequiredContent={elicitationContent}
+--- a/desktop/src/acp/__tests__/elicitationRequests.test.ts
++++ b/desktop/src/acp/__tests__/elicitationRequests.test.ts
+@@ -55,6 +55,13 @@
+ describe('ACP elicitation requests', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    vi.stubGlobal('window', {
++      electron: {
++        getSetting: vi.fn().mockResolvedValue(true),
++        isAnyWindowFocused: vi.fn().mockResolvedValue(false),
++        showNotification: vi.fn(),
++      },
++    });
+     for (const sessionId of TEST_SESSION_IDS) {
+       cancelAcpElicitationRequestsForSession(sessionId);
+     }
+@@ -64,6 +71,7 @@
+     for (const sessionId of TEST_SESSION_IDS) {
+       cancelAcpElicitationRequestsForSession(sessionId);
+     }
++    vi.unstubAllGlobals();
+   });
+ 
+   it('keeps form requests pending until explicit resolve', async () => {
+@@ -139,7 +147,7 @@
+     expect(resolveAcpElicitationRequest('session-1', sessionOneRequest.id, {})).toBe(false);
+   });
+ 
+-  it('cancels pending requests when they expire', async () => {
++  it('declines pending requests when they expire', async () => {
+     vi.useFakeTimers();
+     try {
+       const response = requestAcpElicitation(formRequest('session-1'));
+@@ -153,16 +161,42 @@
+       expect(acpChatSessionActions.setElicitationStatus).toHaveBeenCalledWith(
+         'session-1',
+         appliedRequest.id,
+-        'cancelled'
++        'expired'
+       );
+       expect(acpChatSessionActions.resolveUserInputRequest).toHaveBeenCalledWith(
+         'session-1',
+         `elicitation:${appliedRequest.id}`
+       );
+-      await expect(response).resolves.toEqual({ action: 'cancel' });
++      await expect(response).resolves.toEqual({ action: 'decline', _meta: { 'goose.elicitationTimedOut': true } });
+       expect(resolveAcpElicitationRequest('session-1', appliedRequest.id, {})).toBe(false);
+     } finally {
+       vi.useRealTimers();
+     }
+   });
++
++  it('rejects a stale click even before the timeout callback runs', async () => {
++    vi.useFakeTimers();
++    try {
++      const response = requestAcpElicitation(formRequest('session-1'));
++      const request = vi.mocked(acpChatSessionActions.applyElicitationRequest).mock.calls[0][0];
++      vi.setSystemTime(Date.now() + ACP_ELICITATION_TIMEOUT_SECONDS * 1000);
++      expect(resolveAcpElicitationRequest('session-1', request.id, { project: 'goose' })).toBe(false);
++      await expect(response).resolves.toMatchObject({ action: 'decline' });
++      expect(acpChatSessionActions.setElicitationStatus).toHaveBeenCalledWith('session-1', request.id, 'expired');
++    } finally {
++      vi.useRealTimers();
++    }
++  });
++
++  it('notifies for an unfocused client but not a focused one', async () => {
++    requestAcpElicitation(formRequest('session-1'));
++    await Promise.resolve();
++    await Promise.resolve();
++    expect(window.electron.showNotification).toHaveBeenCalledTimes(1);
++    vi.mocked(window.electron.isAnyWindowFocused).mockResolvedValue(true);
++    requestAcpElicitation(formRequest('session-2'));
++    await Promise.resolve();
++    await Promise.resolve();
++    expect(window.electron.showNotification).toHaveBeenCalledTimes(1);
++  });
+ });
