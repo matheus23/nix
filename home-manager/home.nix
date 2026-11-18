@@ -248,6 +248,8 @@ in
     })
     (unstable.callPackage ../custom/claude-desktop/package.nix { })
     (unstable.callPackage ../custom/goose-desktop/package.nix { })
+    unstable.codex
+    unstable.codex-acp
 
     # two nix language servers that help with getting zed nix integration going
     pkgs.nil

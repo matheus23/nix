@@ -10,8 +10,6 @@ rustPlatform.buildRustPackage {
   pname = "nono-shell";
   version = "0.1.0";
   inherit src;
-  # Remove when the pinned mcp-zoo revision includes --compaction-workspace.
-  patches = [ ./compaction-workspace.patch ];
 
   cargoLock.lockFile = "${src}/Cargo.lock";
   cargoBuildFlags = [
