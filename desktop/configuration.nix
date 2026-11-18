@@ -252,6 +252,11 @@ in
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
 
+  # Rebuilds fetch the private mcp-zoo repository over SSH as root (see
+  # custom/mcp-zoo-src.nix), so root must know GitHub's host key.
+  programs.ssh.knownHosts."github.com".publicKey =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
   # Load i2c_dev kernel module for OpenRGB I2C/SMBus access
   boot.extraModprobeConfig = ''
     options i2c_dev major=89

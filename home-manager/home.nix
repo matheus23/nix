@@ -242,6 +242,10 @@ in
     (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
+    # Lets goose use Claude Code (and its subscription) over ACP.
+    (unstable.claude-agent-acp.override {
+      buildNpmPackage = unstable.buildNpmPackage.override { nodejs = secureNode.nodejs_24; };
+    })
     (unstable.callPackage ../custom/claude-desktop/package.nix { })
     (unstable.callPackage ../custom/goose-desktop/package.nix { })
 

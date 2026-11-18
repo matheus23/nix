@@ -1,0 +1,21 @@
+--- a/crates/goose/src/acp/server.rs
++++ b/crates/goose/src/acp/server.rs
+@@ -2291,7 +2291,17 @@
+             return Err(error);
+         }
+ 
+-        let user_message = Self::convert_acp_prompt_to_message(&args.prompt);
++        let mut user_message = Self::convert_acp_prompt_to_message(&args.prompt);
++        if let Some(message_id) = args
++            .meta
++            .as_ref()
++            .and_then(|meta| meta.get("goose"))
++            .and_then(|goose| goose.get("messageId"))
++            .and_then(|id| id.as_str())
++            .filter(|id| !id.is_empty())
++        {
++            user_message = user_message.with_id(message_id.to_string());
++        }
+         // The client's trace context must stay attached while the turn's spans and tool calls are polled.
+         #[cfg(feature = "otel")]
+         let trace_cx = crate::otel::trace_context::extract_from_meta(args.meta.as_ref())

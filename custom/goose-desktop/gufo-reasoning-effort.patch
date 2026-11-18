@@ -1,0 +1,150 @@
+--- a/crates/goose-providers/src/openai.rs
++++ b/crates/goose-providers/src/openai.rs
+@@ -292,6 +292,9 @@
+             request_config.reasoning =
+                 Some(canonical.and_then(|model| model.reasoning).unwrap_or(true));
+         }
++        if request_config.reasoning.is_none() {
++            request_config.reasoning = self.declared_reasoning(model_config);
++        }
+         let mut payload = create_responses_request_for_model(
+             &request_config,
+             wire_model,
+@@ -481,6 +484,17 @@
+             .or(model_config.supports_vision)
+     }
+ 
++    /// Declared `reasoning` from the provider's own model list, mirroring
++    /// `vision_support`. Only `true` is propagated: `ModelInfo::reasoning` is a
++    /// plain bool, so `false` cannot be told apart from "not declared" and must
++    /// not veto canonical or name-based detection.
++    fn declared_reasoning(&self, model_config: &ModelConfig) -> Option<bool> {
++        self.declared_model(&model_config.model_name)
++            .filter(|model| model.reasoning)
++            .map(|_| true)
++            .or(model_config.reasoning)
++    }
++
+     fn sanitize_request_for_compat(
+         &self,
+         mut payload: serde_json::Value,
+@@ -600,9 +614,8 @@
+     }
+ 
+     /// llama.cpp and Ollama expose the actual allocated context window in the
+-    /// non-standard `meta.n_ctx` field of `/v1/models`; gufo and other builds
+-    /// report it as the top-level `context_length` instead. Returns `None` when
+-    /// neither field is present (e.g. real OpenAI).
++    /// non-standard `meta.n_ctx` field of `/v1/models`. Returns `None` when absent
++    /// (e.g. real OpenAI).
+     async fn fetch_n_ctx_from_api(&self, model_name: &str) -> Result<Option<usize>, ProviderError> {
+         let models_path =
+             Self::map_base_path(&self.base_path, "models", OPEN_AI_DEFAULT_MODELS_PATH);
+@@ -637,18 +650,15 @@
+     Ok(model_ids)
+ }
+ 
+-/// Extract the allocated context window for `model_name` from a `/v1/models`
+-/// response body, accepting llama.cpp's `meta.n_ctx` and the top-level
+-/// `context_length` used by gufo and other OpenAI-compatible servers.
++/// Extract `meta.n_ctx` for `model_name` from a `/v1/models` response body.
+ fn parse_n_ctx_from_models(json: &serde_json::Value, model_name: &str) -> Option<usize> {
+     let data = json.get("data")?.as_array()?;
+ 
+     let n_ctx = |entry: &serde_json::Value| -> Option<usize> {
+         entry
+-            .get("meta")
+-            .and_then(|meta| meta.get("n_ctx"))
+-            .or_else(|| entry.get("context_length"))
+-            .and_then(|value| value.as_u64())
++            .get("meta")?
++            .get("n_ctx")?
++            .as_u64()
+             .map(|v| v as usize)
+     };
+ 
+@@ -823,9 +833,14 @@
+             let thinking_preservation_format =
+                 declared_model.and_then(|m| m.thinking_preservation_format);
+             let supports_vision = self.vision_support(model_config).unwrap_or_default();
++            // A custom provider's declared `reasoning` flag is the only signal for
++            // endpoints whose model name matches no canonical record, so it has to
++            // reach the config the request shape is derived from.
++            let mut request_config = model_config.clone();
++            request_config.reasoning = self.declared_reasoning(model_config);
+ 
+             let mut payload = create_request_with_options(
+-                model_config,
++                &request_config,
+                 system,
+                 messages,
+                 tools,
+@@ -1546,29 +1561,6 @@
+     }
+ 
+     #[test]
+-    fn parse_n_ctx_reads_context_length_without_meta() {
+-        let body = json!({
+-            "data": [
+-                { "id": "qwen3.8-flash-next-q4", "owned_by": "gufo", "context_length": 262144 }
+-            ]
+-        });
+-        assert_eq!(
+-            parse_n_ctx_from_models(&body, "qwen3.8-flash-next-q4"),
+-            Some(262144)
+-        );
+-    }
+-
+-    #[test]
+-    fn parse_n_ctx_prefers_meta_over_context_length() {
+-        let body = json!({
+-            "data": [
+-                { "id": "m", "meta": { "n_ctx": 8192 }, "context_length": 262144 }
+-            ]
+-        });
+-        assert_eq!(parse_n_ctx_from_models(&body, "m"), Some(8192));
+-    }
+-
+-    #[test]
+     fn parse_n_ctx_no_fallback_with_multiple_unmatched_entries() {
+         let body = json!({
+             "data": [
+--- a/crates/goose-provider-types/src/formats/openai.rs
++++ b/crates/goose-provider-types/src/formats/openai.rs
+@@ -1756,11 +1756,19 @@
+     let is_reasoning_model = model_config.openai_reasoning_for_model(&model_name);
+     let supports_xai_effort = supports_xai_reasoning_effort(&model_name);
+     let reasoning_effort = if is_reasoning_model {
+-        model_config
+-            .thinking_effort()
+-            .map_or(legacy_reasoning_effort, |effort| {
+-                openai_reasoning_effort_for_thinking(&model_name, effort)
+-            })
++        match model_config.thinking_effort() {
++            Some(effort) => openai_reasoning_effort_for_thinking(&model_name, effort),
++            None => legacy_reasoning_effort.or_else(|| {
++                // Compat servers apply their own default effort, which is rarely
++                // what an agent loop wants, so hold them at `medium`. Native
++                // OpenAI reasoning models already default to medium upstream.
++                if is_openai_responses_model(&model_name) {
++                    None
++                } else {
++                    openai_reasoning_effort_for_thinking(&model_name, ThinkingEffort::Medium)
++                }
++            }),
++        }
+     } else if supports_xai_effort {
+         model_config
+             .thinking_effort()
+@@ -1770,7 +1778,10 @@
+     };
+ 
+     let system_message = serde_json::to_value(OpenAiMessage {
+-        role: if is_reasoning_model {
++        // `developer` is an OpenAI role. Chat templates for OpenAI-compatible
++        // models (llama.cpp, vLLM) handle only `system`, so emitting `developer`
++        // for them can drop the entire system prompt.
++        role: if is_openai_responses_model(&model_name) {
+             "developer"
+         } else {
+             "system"

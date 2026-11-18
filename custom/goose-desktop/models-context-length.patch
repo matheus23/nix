@@ -1,0 +1,67 @@
+--- a/crates/goose-providers/src/openai.rs
++++ b/crates/goose-providers/src/openai.rs
+@@ -600,8 +600,9 @@
+     }
+ 
+     /// llama.cpp and Ollama expose the actual allocated context window in the
+-    /// non-standard `meta.n_ctx` field of `/v1/models`. Returns `None` when absent
+-    /// (e.g. real OpenAI).
++    /// non-standard `meta.n_ctx` field of `/v1/models`; gufo and other builds
++    /// report it as the top-level `context_length` instead. Returns `None` when
++    /// neither field is present (e.g. real OpenAI).
+     async fn fetch_n_ctx_from_api(&self, model_name: &str) -> Result<Option<usize>, ProviderError> {
+         let models_path =
+             Self::map_base_path(&self.base_path, "models", OPEN_AI_DEFAULT_MODELS_PATH);
+@@ -636,15 +637,18 @@
+     Ok(model_ids)
+ }
+ 
+-/// Extract `meta.n_ctx` for `model_name` from a `/v1/models` response body.
++/// Extract the allocated context window for `model_name` from a `/v1/models`
++/// response body, accepting llama.cpp's `meta.n_ctx` and the top-level
++/// `context_length` used by gufo and other OpenAI-compatible servers.
+ fn parse_n_ctx_from_models(json: &serde_json::Value, model_name: &str) -> Option<usize> {
+     let data = json.get("data")?.as_array()?;
+ 
+     let n_ctx = |entry: &serde_json::Value| -> Option<usize> {
+         entry
+-            .get("meta")?
+-            .get("n_ctx")?
+-            .as_u64()
++            .get("meta")
++            .and_then(|meta| meta.get("n_ctx"))
++            .or_else(|| entry.get("context_length"))
++            .and_then(|value| value.as_u64())
+             .map(|v| v as usize)
+     };
+ 
+@@ -1542,6 +1546,29 @@
+     }
+ 
+     #[test]
++    fn parse_n_ctx_reads_context_length_without_meta() {
++        let body = json!({
++            "data": [
++                { "id": "qwen3.8-flash-next-q4", "owned_by": "gufo", "context_length": 262144 }
++            ]
++        });
++        assert_eq!(
++            parse_n_ctx_from_models(&body, "qwen3.8-flash-next-q4"),
++            Some(262144)
++        );
++    }
++
++    #[test]
++    fn parse_n_ctx_prefers_meta_over_context_length() {
++        let body = json!({
++            "data": [
++                { "id": "m", "meta": { "n_ctx": 8192 }, "context_length": 262144 }
++            ]
++        });
++        assert_eq!(parse_n_ctx_from_models(&body, "m"), Some(8192));
++    }
++
++    #[test]
+     fn parse_n_ctx_no_fallback_with_multiple_unmatched_entries() {
+         let body = json!({
+             "data": [

@@ -4,11 +4,7 @@
 }:
 
 let
-  # Built from the local checkout, so a rebuild picks up new commits.
-  src = lib.cleanSourceWith {
-    src = /home/philipp/program/mcp-zoo;
-    filter = path: type: baseNameOf path != "target" && baseNameOf path != "plans";
-  };
+  src = import ../mcp-zoo-src.nix;
 in
 rustPlatform.buildRustPackage {
   pname = "discord-archive";

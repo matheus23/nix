@@ -1,0 +1,112 @@
+--- a/desktop/src/components/ui/JsonSchemaForm.tsx
++++ b/desktop/src/components/ui/JsonSchemaForm.tsx
+@@ -258,6 +258,51 @@
+     return <div className="text-text-secondary text-sm">{intl.formatMessage(i18n.noFields)}</div>;
+   }
+ 
++  const fields = Object.entries(schema.properties);
++  const [choiceKey, choice] = fields[0];
++  if (
++    fields.length === 1 &&
++    schema.required?.includes(choiceKey) &&
++    (choice.type === 'string' || choice.type === undefined) &&
++    choice.enum && choice.enum.length > 0
++  ) {
++    return (
++      <fieldset disabled={disabled} className="flex flex-col gap-2 min-w-0">
++        <legend className="text-sm font-medium text-text-primary mb-2">
++          {choice.title || choiceKey}
++        </legend>
++        {choice.description && <p className="text-xs text-text-secondary">{choice.description}</p>}
++        <div className="flex flex-wrap gap-2">
++          {choice.enum.map((option) => (
++            <Button
++              key={option}
++              type="button"
++              variant="outline"
++              disabled={disabled}
++              onClick={() => {
++                const error = validateField(choiceKey, option);
++                if (error) {
++                  setErrors({ [choiceKey]: error });
++                  return;
++                }
++                setErrors({});
++                onSubmit({ [choiceKey]: option });
++              }}
++            >
++              {option}
++            </Button>
++          ))}
++          {onCancel && (
++            <Button type="button" variant="outline" onClick={onCancel} disabled={disabled}>
++              {cancelLabel ?? intl.formatMessage(i18n.cancel)}
++            </Button>
++          )}
++        </div>
++        {errors[choiceKey] && <p role="alert" className="text-red-500 text-xs">{errors[choiceKey]}</p>}
++      </fieldset>
++    );
++  }
++
+   return (
+     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+       {Object.entries(schema.properties).map(([key, prop]) => {
+--- /dev/null
++++ b/desktop/src/components/ui/JsonSchemaForm.test.tsx
+@@ -0,0 +1,55 @@
++import { describe, it, expect, vi } from 'vitest';
++import { render, screen, fireEvent } from '@testing-library/react';
++import { IntlTestWrapper } from '../../i18n/test-utils';
++import JsonSchemaForm, { type JsonSchema } from './JsonSchemaForm';
++
++const choices = ['Deny', 'Allow for this call', 'Allow for 15 minutes', 'Allow for this session'];
++const schema: JsonSchema = {
++  type: 'object',
++  properties: { decision: { type: 'string', title: 'Decision', enum: choices } },
++  required: ['decision'],
++};
++
++describe('single-choice forms', () => {
++  it.each(choices)('submits the exact choice %s directly', (choice) => {
++    const submit = vi.fn();
++    render(<JsonSchemaForm schema={schema} onSubmit={submit} />, { wrapper: IntlTestWrapper });
++    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
++    expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
++    expect(submit).not.toHaveBeenCalled();
++    fireEvent.click(screen.getByRole('button', { name: choice }));
++    expect(submit).toHaveBeenCalledExactlyOnceWith({ decision: choice });
++  });
++
++  it('disables every choice while a response is being submitted', () => {
++    const submit = vi.fn();
++    render(<JsonSchemaForm schema={schema} onSubmit={submit} disabled />, { wrapper: IntlTestWrapper });
++    for (const choice of choices) {
++      const button = screen.getByRole('button', { name: choice });
++      expect(button).toBeDisabled();
++      fireEvent.click(button);
++    }
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it('preserves validation for the chosen value', () => {
++    const submit = vi.fn();
++    const constrained = { ...schema, properties: { decision: { ...schema.properties!.decision, minLength: 5 } } };
++    render(<JsonSchemaForm schema={constrained} onSubmit={submit} />, { wrapper: IntlTestWrapper });
++    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
++    expect(screen.getByRole('alert')).toBeInTheDocument();
++    expect(submit).not.toHaveBeenCalled();
++  });
++
++  it('keeps the normal form for multiple fields', () => {
++    const multiple = { ...schema, properties: { ...schema.properties, reason: { type: 'string' } } };
++    render(<JsonSchemaForm schema={multiple} onSubmit={vi.fn()} />, { wrapper: IntlTestWrapper });
++    expect(screen.getByRole('combobox')).toBeInTheDocument();
++    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
++  });
++
++  it('keeps the normal form for an optional choice', () => {
++    render(<JsonSchemaForm schema={{ ...schema, required: [] }} onSubmit={vi.fn()} />, { wrapper: IntlTestWrapper });
++    expect(screen.getByRole('combobox')).toBeInTheDocument();
++  });
++});

@@ -1,0 +1,208 @@
+--- a/desktop/src/acp/adapter/messages.ts
++++ b/desktop/src/acp/adapter/messages.ts
+@@ -46,7 +46,7 @@
+     }
+ 
+     const lastContent = existing.content[existing.content.length - 1];
+-    if (reconcileLocalSteerTextChunk(state, existing, content, gooseMeta.steer)) {
++    if (reconcileLocalUserTextChunk(state, existing, content, gooseMeta.steer)) {
+       return messagesChangeWithLocalSteerConfirmation(state, existing, gooseMeta.steer);
+     }
+ 
+@@ -60,6 +60,9 @@
+ 
+     return messagesChangeWithLocalSteerConfirmation(state, existing, gooseMeta.steer);
+   } else {
++    if (role === 'user' && gooseMeta.steer && messageId && content.type === 'text') {
++      state.localSteerTextByMessageId.set(messageId, content.text);
++    }
+     state.messages.push({
+       ...(messageId ? { id: messageId } : {}),
+       role,
+@@ -196,13 +199,17 @@
+   return changes;
+ }
+ 
+-function reconcileLocalSteerTextChunk(
++function reconcileLocalUserTextChunk(
+   state: AdapterState,
+   message: Message,
+   content: StreamedContentBlock,
+   isSteerChunk: boolean | undefined
+ ): boolean {
+-  if (!isSteerChunk || !message.metadata.steer || message.role !== 'user') {
++  if (message.role !== 'user' || !(
++    message.metadata.optimistic ||
++    (message.id && state.localSteerTextByMessageId.has(message.id)) ||
++    (isSteerChunk && message.metadata.steer)
++  )) {
+     return false;
+   }
+ 
+@@ -221,6 +228,6 @@
+   }
+ 
+   message.content = [{ ...content, text: nextText }, ...message.content.slice(1)];
+-  message.metadata = { ...message.metadata, steer: true };
++  message.metadata = { ...message.metadata, optimistic: false, ...(isSteerChunk ? { steer: true } : {}) };
+   return true;
+ }
+--- a/desktop/src/acp/chatSessionStore.ts
++++ b/desktop/src/acp/chatSessionStore.ts
+@@ -737,33 +737,15 @@
+ }
+ 
+ function createAdapterForEntry(entry: StoreEntry): AcpSessionNotificationAdapter {
++  const messageIds = new Set(entry.messages.map((message) => message.id));
++  // Queue acknowledgement confirms delivery, not text. Preserve only chunks
++  // actually received from the server when rebuilding the adapter.
+   return createAcpSessionNotificationAdapter(
+     entry.messages,
+-    confirmedLocalSteerTextByMessageId(entry)
++    new Map([...entry.adapter.getStreamedUserText()].filter(([id]) => messageIds.has(id)))
+   );
+ }
+ 
+-function confirmedLocalSteerTextByMessageId(entry: StoreEntry): Map<string, string> {
+-  const textByMessageId = new Map<string, string>();
+-
+-  for (const message of entry.messages) {
+-    if (
+-      !message.id ||
+-      !message.metadata.steer ||
+-      entry.pendingLocalSteerMessageIds.has(message.id)
+-    ) {
+-      continue;
+-    }
+-
+-    const firstContent = message.content[0];
+-    if (firstContent?.type === 'text') {
+-      textByMessageId.set(message.id, firstContent.text);
+-    }
+-  }
+-
+-  return textByMessageId;
+-}
+-
+ function snapshotFromEntry(entry: StoreEntry): AcpChatSessionSnapshot {
+   return {
+     session: entry.session,
+--- a/desktop/src/acp/sessionNotificationAdapter.ts
++++ b/desktop/src/acp/sessionNotificationAdapter.ts
+@@ -33,6 +33,7 @@
+   applyElicitationRequest(request: AcpElicitationRequest): AcpChatStateChange[];
+   applyElicitationStatus(elicitationId: string, status: ElicitationStatus): AcpChatStateChange[];
+   getMessages(): Message[];
++  getStreamedUserText(): Map<string, string>;
+ }
+ 
+ export function createAcpSessionNotificationAdapter(
+@@ -67,6 +68,9 @@
+     getMessages() {
+       return state.messages.map(cloneMessage);
+     },
++    getStreamedUserText() {
++      return new Map(state.localSteerTextByMessageId);
++    },
+   };
+ }
+ 
+--- a/desktop/src/types/message.ts
++++ b/desktop/src/types/message.ts
+@@ -181,6 +181,7 @@
+ };
+ 
+ export type MessageMetadata = {
++  optimistic?: boolean;
+   agentVisible: boolean;
+   fallbackContent?: boolean;
+   inference?: InferenceMetadata | null;
+@@ -315,7 +316,7 @@
+     role: 'user',
+     created: Math.floor(Date.now() / 1000),
+     content,
+-    metadata: { userVisible: true, agentVisible: true },
++    metadata: { userVisible: true, agentVisible: true, optimistic: true },
+   };
+ }
+ 
+--- a/desktop/src/acp/prompt.ts
++++ b/desktop/src/acp/prompt.ts
+@@ -14,6 +14,7 @@
+   return client.connection.agent.request(methods.agent.session.prompt, {
+     sessionId,
+     prompt: messageToAcpPromptContent(message),
++    _meta: { goose: { messageId: message.id } },
+   });
+ }
+ 
+--- /dev/null
++++ b/desktop/src/acp/__tests__/localMessageEcho.test.ts
+@@ -0,0 +1,67 @@
++import type { SessionNotification } from '@agentclientprotocol/sdk';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import type { Message } from '../../types/message';
++import { acpPromptSession } from '../prompt';
++import { acpChatSessionActions, acpChatSessionStore } from '../chatSessionStore';
++import { createAcpSessionNotificationAdapter } from '../sessionNotificationAdapter';
++
++const { requestPrompt } = vi.hoisted(() => ({ requestPrompt: vi.fn().mockResolvedValue({ stopReason: 'end_turn' }) }));
++vi.mock('../acpConnection', () => ({
++  getAcpClient: async () => ({ connection: { agent: { request: requestPrompt } } }),
++}));
++
++function localMessage(id: string, text: string, steer = false): Message {
++  const metadata = { userVisible: true, agentVisible: true, steer, optimistic: true };
++  return { id, role: 'user', created: 123, content: [{ type: 'text', text }], metadata };
++}
++
++function chunk(sessionId: string, id: string, text: string, steer = false): SessionNotification {
++  return { sessionId, update: {
++    sessionUpdate: 'user_message_chunk', messageId: id, content: { type: 'text', text },
++    _meta: { goose: { messageId: id, steer } },
++  } } as SessionNotification;
++}
++
++afterEach(() => {
++  acpChatSessionActions.deleteSnapshot('echo-race');
++  requestPrompt.mockClear();
++});
++
++describe('local user-message echoes', () => {
++  it('sends the optimistic prompt ID to the backend', async () => {
++    await acpPromptSession('echo-race', localMessage('compact-1', '/compact'));
++    expect(requestPrompt.mock.calls[0][1]._meta).toMatchObject({ goose: { messageId: 'compact-1' } });
++  });
++
++  it('reconciles a compact command echo without duplicating its text', () => {
++    const adapter = createAcpSessionNotificationAdapter([localMessage('compact-1', '/compact')]);
++    adapter.apply(chunk('echo-race', 'compact-1', '/com'));
++    adapter.apply(chunk('echo-race', 'compact-1', 'pact'));
++    expect(adapter.getMessages()).toHaveLength(1);
++    expect(adapter.getMessages()[0].content).toEqual([{ type: 'text', text: '/compact' }]);
++  });
++
++  it.each([true, false])('does not treat queue acceptance as echoed text (ack first: %s)', (ackFirst) => {
++    const acknowledge = () => acpChatSessionActions.applyAcpSessionNotification({
++      sessionId: 'echo-race', update: { sessionUpdate: 'session_info_update',
++        _meta: { goose: { queuedSteer: { messageId: 'steer-1', runId: 'run-1' } } },
++      },
++    } as SessionNotification);
++    if (ackFirst) acknowledge();
++    acpChatSessionActions.addPendingLocalSteerMessage('echo-race', localMessage('steer-1', 'hello', true));
++    if (!ackFirst) acknowledge();
++    acpChatSessionActions.applyAcpSessionNotification(chunk('echo-race', 'steer-1', 'hel', true));
++    const partial = acpChatSessionStore.getSnapshot('echo-race')!;
++    acpChatSessionActions.setMessages('echo-race', partial.messages);
++    const result = acpChatSessionActions.applyAcpSessionNotification(chunk('echo-race', 'steer-1', 'lo', true));
++    expect(result.messages).toHaveLength(1);
++    expect(result.messages[0].content).toEqual([{ type: 'text', text: 'hello' }]);
++  });
++
++  it('keeps repeated text deltas when they are genuinely part of the message', () => {
++    const adapter = createAcpSessionNotificationAdapter([localMessage('steer-1', 'go go', true)]);
++    adapter.apply(chunk('echo-race', 'steer-1', 'go ', true));
++    adapter.apply(chunk('echo-race', 'steer-1', 'go', true));
++    expect(adapter.getMessages()[0].content).toEqual([{ type: 'text', text: 'go go' }]);
++  });
++});
