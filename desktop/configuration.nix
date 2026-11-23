@@ -285,6 +285,11 @@ in
     TIMELINE_LIMIT_WEEKLY = 3;
     TIMELINE_LIMIT_MONTHLY = 3;
     TIMELINE_LIMIT_YEARLY = 0;
+    # snapshotRootOnBoot creates cleanup=number snapshots, which the timeline
+    # cleanup never touches. Without these they accumulate forever.
+    NUMBER_CLEANUP = true;
+    NUMBER_LIMIT = 10;
+    NUMBER_LIMIT_IMPORTANT = 5;
   };
 
   services.snapper.configs.home = {
