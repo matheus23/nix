@@ -31,11 +31,25 @@ let
     maxRequestBytes = 512 * 1024 * 1024;
     extraArgs = [ "--log-progress" ];
   };
+
+  # llama-server no longer serves Qwen3.8-Flash-Next, so the fetcher for its
+  # GGUF shards lives here with the engine that actually loads them.
+  downloadModels = pkgs.writeShellApplication {
+    name = "download-qwen38-flash-next-model";
+    runtimeInputs = with pkgs; [
+      aria2
+      coreutils
+    ];
+    text = builtins.readFile ../scripts/download-qwen38-llama-models.sh;
+  };
 in
 {
-  # The service is deliberately not enabled by default: the existing
-  # llama-server uses the same GPU. Start gufo-server manually for comparison.
-  environment.systemPackages = [ gufo ];
+  # The service is deliberately not enabled by default: llama-server uses the
+  # same GPU. Start gufo-server manually for comparison.
+  environment.systemPackages = [
+    gufo
+    downloadModels
+  ];
 
   systemd.services.gufo-server = {
     description = "Gufo Strix Halo inference server";
