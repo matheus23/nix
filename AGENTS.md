@@ -17,6 +17,7 @@ This is a personal NixOS configuration repository, not an application codebase. 
 Both machines are managed via `nixosConfigurations` in `flake.nix`, matched by hostname (`philipps-desktop` for desktop, `nixos` for laptop):
 
 ```sh
+rebuild                                                  # shortcut: nixos-rebuild switch --flake <repo> --sudo (also: rebuild test / boot / dry-build)
 nixos-rebuild switch --flake . --sudo                    # rebuild current machine (auto-detects host)
 nixos-rebuild switch --flake .#philipps-desktop --sudo   # explicit desktop target
 nixos-rebuild switch --flake .#nixos --sudo              # explicit laptop target

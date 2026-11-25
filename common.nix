@@ -10,6 +10,36 @@ let
   pigeons = pkgs.callPackage ./custom/pigeons/package.nix {
     src = inputs.pigeons-src;
   };
+
+  rebuild = pkgs.writeShellApplication {
+    name = "rebuild";
+    text = ''
+      if [[ -n "''${NIXOS_CONFIG_DIR:-}" ]]; then
+        flake_dir="$NIXOS_CONFIG_DIR"
+      elif [[ -f "$HOME/program/nix/flake.nix" ]]; then
+        flake_dir="$HOME/program/nix"
+      elif [[ -f "$HOME/program/nix/home/flake.nix" ]]; then
+        flake_dir="$HOME/program/nix/home"
+      else
+        echo "rebuild: could not find flake.nix under $HOME/program/nix" >&2
+        exit 1
+      fi
+
+      if [[ $# -eq 0 || "$1" == -* ]]; then
+        action="switch"
+      else
+        action="$1"
+        shift
+      fi
+
+      extra=()
+      case "$action" in
+        switch|boot|test|dry-activate) extra=(--sudo) ;;
+      esac
+
+      exec nixos-rebuild "$action" --flake "$flake_dir" "''${extra[@]}" "$@"
+    '';
+  };
 in
 {
   imports = [
@@ -95,6 +125,7 @@ in
 
   environment.systemPackages = [
     pigeons
+    rebuild
   ];
 
   # Declarative pigeons roost (don't also run `pigeons service install`).

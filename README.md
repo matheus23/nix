@@ -6,7 +6,15 @@ Both machines and shared Home Manager settings are defined declaratively via `fl
 
 ## Rebuilding
 
-From this repository:
+From anywhere (defaults to `switch`; accepts `test`, `boot`, `dry-build`, etc. plus extra `nixos-rebuild` flags):
+
+```sh
+rebuild          # nixos-rebuild switch --flake <repo> --sudo
+rebuild test     # nixos-rebuild test --flake <repo> --sudo
+rebuild boot     # nixos-rebuild boot --flake <repo> --sudo
+```
+
+Or directly from this repository:
 
 ```sh
 nixos-rebuild switch --flake . --sudo
