@@ -38,6 +38,7 @@ let
 in
 {
   imports = [
+    ./antigravity-cli.nix
     ./discord-archive.nix
     ./nono-shell.nix
   ];

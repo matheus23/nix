@@ -126,3 +126,35 @@ Gotchas:
 - `react@18.2.0` conflicts with `@pierre/diffs`'s peer dep (`^18.3.1 || ^19.0.0`); `--legacy-peer-deps` is passed via `npmFlags`.
 - Native modules (`sharp`, `node-pty`) are compiled during `npm rebuild` in the build sandbox.
 - The CLI creates `~/.letta/` at first run for settings and agent state.
+
+## Custom antigravity-cli Package
+
+`custom/antigravity-cli/package.nix` packages Google's Antigravity CLI (binary: `agy`) from the
+prebuilt tarball Google serves to its own installer, and `home-manager/antigravity-cli.nix` installs
+it. nixpkgs has the same package (`antigravity-cli`, seen in `<nixos-unstable>`), but it lags and
+leaves the self-updater on; this one is pinned and wraps `agy` with `AGY_CLI_DISABLE_AUTO_UPDATE`.
+
+To bump: read `version` and the build id from
+`https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_amd64.json`
+(the manifest the official installer reads), then recompute both tarball hashes with
+`nix hash convert --hash-algo sha256 --to sri "$(curl -fsSL <url> | sha256sum | cut -d' ' -f1)"`.
+Both `version` and `buildId` appear in the download path, so both must change.
+
+Gotchas:
+- The tarball member is `antigravity`; the installed command is `agy`.
+- **The command sandbox needs store read grants.** `agy` runs agent commands in a new mount
+  namespace whose root has only FHS directories plus its `read_file` grants. `autoPatchelfHook`
+  repoints the binary's ELF interpreter at a glibc in the store, so after `pivot_root` the sandbox
+  helper dies with `sbox: exec /proc/self/exe: no such file or directory` and every command fails
+  with `connecting to sandbox server: ... connection reset by peer` — and `auto` mode turns the
+  sandbox on by default. `home-manager/antigravity-cli.nix` merges `read_file(/nix/store)`,
+  `read_file(/run/current-system/sw)` and `read_file(/etc/profiles)` into
+  `~/.gemini/antigravity-cli/settings.json` to fix this. Tracked upstream as
+  [google-antigravity/antigravity-cli#1753](https://github.com/google-antigravity/antigravity-cli/issues/1753);
+  drop the grants once that ships.
+- `agy` owns that `settings.json` and rewrites it from `/config`, so the module merges additively
+  rather than managing the file. `agy-nix-sandbox-grants` (installed) re-applies the grants by hand.
+- Sign-in uses the D-Bus secret-service; GNOME Keyring covers it on this desktop. Over SSH, agy
+  prints an authorization URL instead of opening a browser.
+- Do **not** run upstream's `curl .../install.sh | bash` alongside this: it writes `~/.local/bin/agy`,
+  which is on `PATH` via `home.sessionPath` and would shadow the packaged binary.
