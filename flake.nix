@@ -4,6 +4,27 @@
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+
+    # Pin the Gufo source independently of this repository's nixpkgs. Gufo's
+    # flake carries the ROCm toolchain it qualifies for Strix Halo.
+    gufo.url = "github:gufo-org/gufo/2845939b2a7d61243d407c8816c6d42652512e50"; # v0.34.0
+
+    # Private SSH repos pinned to explicit commits so rebuilds only ship commits
+    # you chose. Bump `rev` and run `nix flake lock` to update.
+    pigeons-src = {
+      url = "git+ssh://git@github.com/n0-computer/pigeons.git?ref=main&rev=0685098c954cc7bf10f008dbce697b3a834db58b";
+      flake = false;
+    };
+    mcp-zoo-src = {
+      url = "git+ssh://git@github.com/matheus23/mcp-zoo.git?ref=main&rev=cfe9ff194935edb02df582d7117888b3b46ab6d6";
+      flake = false;
+    };
+
     # fixes https://github.com/NixOS/nixpkgs/issues/298285
     # using nixpkgs from that branch until it's merged
     nixpkgs-androidenv.url = "github:hadilq/nixpkgs/androidenv-fix-ndk-toolchains";
@@ -25,8 +46,40 @@
       command-utils,
       flake-utils,
       rust-overlay,
-    }:
-    flake-utils.lib.eachDefaultSystem (system: {
+      ...
+    }@inputs:
+    let
+      mkHost =
+        {
+          system ? "x86_64-linux",
+          modules,
+        }:
+        let
+          unstable = import nixpkgs-unstable {
+            inherit system;
+            config.allowUnfree = true;
+          };
+        in
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = {
+            inherit inputs unstable;
+          };
+          modules = [ ./common.nix ] ++ modules;
+        };
+    in
+    {
+      nixosConfigurations = {
+        philipps-desktop = mkHost {
+          modules = [ ./desktop/configuration.nix ];
+        };
+
+        nixos = mkHost {
+          modules = [ ./laptop/configuration.nix ];
+        };
+      };
+    }
+    // flake-utils.lib.eachDefaultSystem (system: {
       # A devShell for tauri development
       devShells.tauri =
         let

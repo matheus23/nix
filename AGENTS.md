@@ -4,33 +4,44 @@ This is a personal NixOS configuration repository, not an application codebase. 
 
 ## Directory Structure
 
-- `flake.nix` — Flake with devShells for multiple projects
-- `desktop/configuration.nix` — Desktop system config (stateVersion 25.11)
-- `laptop/configuration.nix` — Laptop system config (stateVersion 22.11)
+- `flake.nix` — Flake exporting `nixosConfigurations` (`philipps-desktop`, `nixos`) and `devShells`
+- `common.nix` — Shared NixOS module imported by both machines (CA trust, GNOME/PipeWire, SSH/pigeons, Home Manager, nix settings)
+- `desktop/configuration.nix` — Desktop-specific system config (stateVersion 25.11, Strix Halo GPU, Snapper, local LLM servers)
+- `laptop/configuration.nix` — Laptop-specific system config (stateVersion 22.11, ThinkPad T14 Gen 3 AMD, TLP, agent container)
 - `home-manager/home.nix` — Shared home-manager config (user: `philipp`)
-- `custom/*.nix` — Custom package overrides (wesnoth, tracy, ideal-fonts, lmstudio, letta-code, mnemosyne)
+- `custom/*` — Custom packages and overrides (pigeons, discord-archive, nono-shell, goose-desktop, letta-code, antigravity-cli, btrfs-pressure-monitor, btrfs-snap-scrub, etc.)
 - `scripts/` — Helper scripts
-
-## Critical Path Differences
-
-Desktop imports home-manager from `/home/philipp/program/nix/home-manager/home.nix`.
-Laptop imports from `/home/philipp/program/nix/home/home-manager/home.nix`. These paths differ — be careful when editing which machine is active.
 
 ## Rebuilding the System
 
+Both machines are managed via `nixosConfigurations` in `flake.nix`, matched by hostname (`philipps-desktop` for desktop, `nixos` for laptop):
+
 ```sh
-sudo -E nixos-rebuild switch          # rebuild current machine
-sudo -E nixos-rebuild switch --upgrade  # also update nixpkgs channels
+sudo -E nixos-rebuild switch --flake .                    # rebuild current machine (auto-detects host)
+sudo -E nixos-rebuild switch --flake .#philipps-desktop   # explicit desktop target
+sudo -E nixos-rebuild switch --flake .#nixos              # explicit laptop target
 ```
 
-`-E` is required: the `pigeons` package (`custom/pigeons/package.nix`) uses `builtins.fetchGit` over SSH to fetch a private repo at evaluation time, which runs as root under `sudo` and needs `SSH_AUTH_SOCK` forwarded from your ssh-agent (GNOME keyring). If you ever drop the SSH-fetched pigeons source, you can go back to plain `sudo nixos-rebuild switch`.
+Updating inputs:
 
-After a rebuild, reboot if kernel or bootloader changed.
+```sh
+nix flake update                    # update all unpinned flake inputs
+nix flake update nixpkgs-unstable   # update a single input
+```
+
+Notes:
+- **New files must be tracked by Git** (`git add` or `git add -N`) before Nix flake evaluation can see them.
+- **Private SSH inputs (`pigeons-src`, `mcp-zoo-src`)** are pinned to explicit `rev` values in `flake.nix` and locked in `flake.lock`. To bump one, update its `rev` in `flake.nix` and run `nix flake lock` as your user (so your ssh-agent is used). Passing `-E` to `sudo nixos-rebuild` (or using `nixos-rebuild switch --flake . --sudo`) forwards `SSH_AUTH_SOCK` if a fresh machine needs to fetch those inputs for the first time.
+- After a rebuild, reboot if kernel or bootloader changed.
 
 ## Flake Inputs
 
-- `nixpkgs` → `nixos-25.11` (stable)
-- `nixpkgs-unstable` → `nixos-unstable`
+- `nixpkgs` → `nixos-26.05` (stable, also pinned as the system `nixpkgs` registry entry)
+- `nixpkgs-unstable` → `nixos-unstable` (passed to modules as `unstable`)
+- `home-manager` → `release-26.05` (follows `nixpkgs`)
+- `nixos-hardware` → ThinkPad T14 Gen 3 AMD module
+- `gufo` → pinned Gufo flake (keeps its own ROCm toolchain for Strix Halo)
+- `pigeons-src`, `mcp-zoo-src` → pinned private SSH repos (`flake = false`)
 - `nixpkgs-androidenv` → fork for NDK toolchain fix
 - `rust-overlay`, `flake-utils`, `command-utils`
 
@@ -63,17 +74,19 @@ The `n0des` shell auto-manages a local PostgreSQL instance:
 ## Laptop-Specific Config
 
 - Power management via `tlp` (not power-profiles-daemon)
+- `boot.loader.systemd-boot.configurationLimit = 5` (511 MiB `/boot/efi` partition)
 - Virtual camera/mic via `v4l2loopback` and `snd-aloop`
-- Docker enabled, user in `docker` and `adbusers` groups
-- `nix-ld` enabled for running downloaded binaries
-- Firewall allows TCP 1420/1421 (tauri/vite HMR)
+- `android-tools` installed for ADB (systemd 258 handles uaccess rules; `programs.adb` was removed in 26.05)
+- `nix-ld` enabled with extra libraries for running downloaded binaries
+- `containers.agent-box` + `pigeons-agent` service for the sandboxed laptop agent
+- `letta-code` (`le-nono`) and `nono-shell` are currently desktop-only HM imports (`desktop/configuration.nix`); `custom.discord-archive.spkiHash` is set per host in each machine's `configuration.nix`
 
 ## Common Gotchas
 
-- `home-manager/home.nix` uses `<nixos-unstable>` channel for `unstable` pkgs binding — this resolves from the system's nix-channel, not the flake input.
+- `unstable` is instantiated once per host in `flake.nix` from `inputs.nixpkgs-unstable` (with `allowUnfree = true`) and passed via `specialArgs` / `home-manager.extraSpecialArgs`.
+- `home-manager.useGlobalPkgs = true` is set in `common.nix`, so do not set `nixpkgs.config` inside `home-manager/home.nix`.
 - `bashInteractive` is included in most devShells to fix VS Code terminal issues on NixOS.
-- `permittedInsecurePackages` includes old electron and openssl versions — required by some packages.
-- Flakes are enabled via `nix.settings.experimental-features = "nix-command flakes"` in both machine configs.
+- Flakes and `nix-command` are enabled in `common.nix`.
 
 ## Custom lmstudio Package
 

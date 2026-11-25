@@ -1,16 +1,21 @@
-{ pkgs, ... }:
+{
+  inputs,
+  pkgs,
+  ...
+}:
 
 let
-  # Pin the Gufo source independently of this repository's nixpkgs. Gufo's
-  # flake carries the ROCm toolchain it qualifies for Strix Halo.
-  gufoFlake = builtins.getFlake "github:gufo-org/gufo/2845939b2a7d61243d407c8816c6d42652512e50"; # v0.34.0
+  system = pkgs.stdenv.hostPlatform.system;
+  # Pinned as an independent flake input in flake.nix so Gufo keeps the ROCm
+  # toolchain it qualifies for Strix Halo.
+  gufoFlake = inputs.gufo;
   # Agent clients re-send retained screenshots on every turn. Keep a 256 MiB
   # decoded-image budget; maxRequestBytes below covers the base64 HTTP body.
   # Remove the patch when upstream allows configuring this budget.
-  gufo = gufoFlake.packages.${pkgs.system}.default.overrideAttrs (
+  gufo = gufoFlake.packages.${system}.default.overrideAttrs (
     _final: prev: { patches = (prev.patches or [ ]) ++ [ ./gufo-image-limit.patch ]; }
   );
-  gufoServe = gufoFlake.lib.${pkgs.system}.mkGufoServe {
+  gufoServe = gufoFlake.lib.${system}.mkGufoServe {
     inherit gufo;
     host = "127.0.0.1";
     port = 8422;

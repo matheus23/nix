@@ -3,8 +3,16 @@
 # per call; the user approves it in goose's form. It replaces the Developer
 # extension's unsandboxed shell, write and edit tools, so that extension is
 # disabled in ~/.config/goose/config.yaml.
-{ pkgs, ... }:
+{
+  inputs,
+  pkgs,
+  ...
+}:
 
 {
-  home.packages = [ (pkgs.callPackage ../custom/nono-shell/package.nix { }) ];
+  home.packages = [
+    (pkgs.callPackage ../custom/nono-shell/package.nix {
+      src = inputs.mcp-zoo-src;
+    })
+  ];
 }

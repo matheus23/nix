@@ -1,12 +1,13 @@
 {
   pkgs,
   config,
+  inputs,
   lib,
+  unstable,
   ...
 }:
 
 let
-  unstable = import <nixos-unstable> { config = config.nixpkgs.config; };
   secureNode = import ../custom/nodejs-security.nix { pkgs = unstable; };
 
   # Requests must use the NixOS CA exclusions, including when the GUI starts the daemon.
@@ -29,30 +30,20 @@ let
 
   kache = pkgs.callPackage ../custom/kache/package.nix { };
 
-  letta-code = pkgs.callPackage ../custom/letta-code/package.nix {
-    nodejs_22 = secureNode.nodejs_22;
+  pigeons = pkgs.callPackage ../custom/pigeons/package.nix {
+    src = inputs.pigeons-src;
   };
-
-  pigeons = pkgs.callPackage ../custom/pigeons/package.nix { };
 
 in
 {
   imports = [
     ./antigravity-cli.nix
     ./discord-archive.nix
-    ./nono-shell.nix
   ];
 
   home.username = "philipp";
   home.homeDirectory = "/home/philipp";
   home.stateVersion = "22.11";
-
-  nixpkgs.config.allowUnfree = true;
-  # I wish I knew what needed this. :|
-  nixpkgs.config.permittedInsecurePackages = [
-    "electron-24.8.6"
-    "electron-25.9.0"
-  ];
 
   home.sessionPath = sessionPath;
   home.sessionVariables = {
@@ -127,6 +118,7 @@ in
   programs.firefox = {
     enable = true;
     package = unstable.firefox;
+    configPath = ".mozilla/firefox";
   };
 
   programs.obs-studio = {
@@ -151,7 +143,7 @@ in
     unstable.chromium
     pkgs.yarn
     secureNode.nodejs_24
-    pkgs.nixfmt-rfc-style
+    pkgs.nixfmt
     # pkgs.fastfetch # for fun (prints system info)
     pkgs.obsidian
     pkgs.yq
@@ -239,8 +231,6 @@ in
       buildNpmPackage = unstable.buildNpmPackage.override { nodejs = secureNode.nodejs_24; };
     })
     (pkgs.callPackage ../custom/btrfs-snap-scrub/package.nix { })
-    letta-code
-    (pkgs.callPackage ./le-nono.nix { inherit unstable letta-code; })
     # (pkgs.callPackage ../custom/open-design/package.nix { }) # opendesign kinda sucks
     unstable.claude-code
     # Lets goose use Claude Code (and its subscription) over ACP.
