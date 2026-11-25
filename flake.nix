@@ -10,12 +10,10 @@
     };
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
 
-    # Pin the Gufo source independently of this repository's nixpkgs. Gufo's
-    # flake carries the ROCm toolchain it qualifies for Strix Halo.
+    # Keeps its own ROCm toolchain for Strix Halo
     gufo.url = "github:gufo-org/gufo/2845939b2a7d61243d407c8816c6d42652512e50"; # v0.34.0
 
-    # Private SSH repos pinned to explicit commits so rebuilds only ship commits
-    # you chose. Bump `rev` and run `nix flake lock` to update.
+    # Pinned private SSH repos (bump rev + `nix flake lock`)
     pigeons-src = {
       url = "git+ssh://git@github.com/n0-computer/pigeons.git?ref=main&rev=0685098c954cc7bf10f008dbce697b3a834db58b";
       flake = false;
@@ -537,14 +535,7 @@
       devShells.llama-cpp =
         let
           pkgs = import nixpkgs { inherit system; };
-          # CMake's FindVulkan.cmake looks for:
-          #   $VULKAN_SDK/include/vulkan/vulkan.h  (from vulkan-headers)
-          #   $VULKAN_SDK/lib/libvulkan.so         (from vulkan-loader)
-          # The patched ggml-vulkan CMakeLists also appends $VULKAN_SDK to
-          # CMAKE_PREFIX_PATH so find_package(SPIRV-Headers CONFIG) succeeds,
-          # which requires:
-          #   $VULKAN_SDK/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake
-          #                                        (from spirv-headers)
+          # Single $VULKAN_SDK root for FindVulkan + SPIRV-Headers cmake config
           vulkan-combined = pkgs.symlinkJoin {
             name = "vulkan-combined";
             paths = with pkgs; [

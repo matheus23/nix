@@ -23,11 +23,7 @@ let
     hash = "sha256-rSJVKNK0d2n5bS0ZvnF9i2LocEue2VmDYBUtEzXbf+I=";
   };
 
-  # Workspace packages the daemon (od CLI) depends on, in dependency build
-  # order. Mirrors upstream flake.nix `daemonWorkspacePaths` at this tag.
-  # apps/web and other non-daemon packages are excluded so pnpm only
-  # resolves daemon deps (otherwise the offline install would fail trying
-  # to link web deps that aren't in the vendored pnpm store).
+  # Daemon workspace packages in build order (matches upstream flake.nix)
   daemonWorkspacePaths = [
     "packages/contracts"
     "packages/registry-protocol"
@@ -60,11 +56,7 @@ let
     "pnpm-workspace.yaml"
   ] ++ (map (p: "${p}/package.json") daemonWorkspacePaths);
 
-  # Reproduce upstream's filtered source trees (cleanSourceWith needs a
-  # real path, but the fetched tarball is a fixed-output store path, so we
-  # copy only the relevant entries into a fresh derivation). Keeping the
-  # manifest set identical to upstream means fetchPnpmDeps produces the
-  # same store and the vendored daemonHash still matches.
+  # Filtered copy of repoSrc so fetchPnpmDeps matches upstream's hash
   filterSrc =
     includePaths:
     stdenv.mkDerivation {
@@ -90,8 +82,7 @@ let
   daemonSrc = filterSrc daemonIncludePaths;
   pnpmDepsSrc = filterSrc pnpmDepsIncludePaths;
 
-  # package.json declares engines.pnpm ">=10.33.2 <11"; nixpkgs pnpm_10 is
-  # older, so override to the exact tarball pinned by `packageManager`.
+  # package.json requires pnpm >=10.33.2 <11
   pnpm = pnpm_10.overrideAttrs (_: rec {
     version = "10.33.2";
     src = fetchurl {
@@ -105,9 +96,7 @@ let
   pnpmDepsHash = (import ./pnpm-deps.nix).daemonHash;
   pnpmWorkspaceFilters = map (workspacePath: "./${workspacePath}") daemonWorkspacePaths;
 
-  # --- web frontend (Next.js static export) ---------------------------------
-  # Mirrors upstream nix/package-web.nix. Built separately so it gets its
-  # own pnpm deps (webHash) and workspace filter.
+  # Next.js static export served by the daemon from apps/web/out
   webWorkspacePaths = [
     "packages/components"
     "packages/contracts"
@@ -132,10 +121,6 @@ let
   dependencyBuildPathsWeb = lib.filter (p: p != "apps/web") webWorkspacePaths;
   webPnpmDepsHash = (import ./pnpm-deps.nix).webHash;
 
-  # The daemon serves the SPA itself from PROJECT_ROOT/apps/web/out when
-  # that dir exists (server.js: express.static + registerStaticSpaFallback).
-  # Building the web export and dropping it there makes `od` serve the UI
-  # single-origin with its API — no separate Caddy/reverse-proxy needed.
   webPkg = stdenv.mkDerivation (finalAttrs: {
     pname = "open-design-web";
     inherit version;
@@ -192,9 +177,7 @@ stdenv.mkDerivation (finalAttrs: {
     pnpm
     pnpmConfigHook
     makeWrapper
-    # Required to rebuild better-sqlite3's native binding from source.
-    # node-gyp drives this via Python; gnumake/pkg-config + the C++ compiler
-    # from stdenv complete the toolchain.
+    # For building better-sqlite3 from source
     python3
     gnumake
     pkg-config
@@ -214,8 +197,7 @@ stdenv.mkDerivation (finalAttrs: {
   buildPhase = ''
     runHook preBuild
 
-    # Build better-sqlite3's native binding from source. better-sqlite3
-    # has no Node 24 prebuild, so we skip the CDN download and compile.
+    # better-sqlite3 has no Node 24 prebuild
     export npm_config_nodedir=${nodejs}
     export npm_config_build_from_source=true
     export PATH="${nodejs}/lib/node_modules/npm/bin/node-gyp-bin:$PATH"
@@ -247,13 +229,9 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
     mkdir -p $out/lib/open-design $out/bin
 
-    # Copy the whole workspace tree — pnpm's symlinks under node_modules
-    # resolve sibling packages by relative paths, so we cannot prune to
-    # just apps/daemon.
+    # Keep workspace tree for pnpm's relative symlinks
     cp -r . $out/lib/open-design/
 
-    # Keep workspace package dist/ + manifests, prune source/test/build
-    # config before Nix fixup scans the output tree.
     for target in ${lib.escapeShellArgs daemonWorkspacePaths}; do
       if [ "$target" = "apps/daemon" ]; then
         find "$out/lib/open-design/$target" -mindepth 1 -maxdepth 1 \
@@ -271,8 +249,7 @@ stdenv.mkDerivation (finalAttrs: {
       fi
     done
 
-    # Prune dangling symlinks to workspaces the daemon doesn't ship, so
-    # Nix fixup does not fail on broken links.
+    # Remove dangling symlinks to non-daemon workspaces
     rm -f \
       $out/lib/open-design/node_modules/@open-design/components \
       $out/lib/open-design/node_modules/@open-design/tools-dev \
@@ -284,8 +261,6 @@ stdenv.mkDerivation (finalAttrs: {
       $out/lib/open-design/node_modules/.bin/tools-release \
       $out/lib/open-design/node_modules/.bin/tools-serve
 
-    # Bundle the web frontend so the daemon serves the SPA at / on the same
-    # origin as its API (the daemon serves apps/web/out when present).
     mkdir -p $out/lib/open-design/apps/web/out
     cp -r ${webPkg}/. $out/lib/open-design/apps/web/out/
 

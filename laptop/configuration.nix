@@ -1,4 +1,3 @@
-# Laptop-specific NixOS configuration. Shared settings live in ../common.nix.
 {
   config,
   inputs,
@@ -14,42 +13,34 @@ let
 in
 {
   imports = [
-    # Include the results of the hardware scan.
     ./hardware-configuration.nix
-    # Hardware quirks for ThinkPad T14 Gen 3 AMD (incl. WiFi).
     inputs.nixos-hardware.nixosModules.lenovo-thinkpad-t14-amd-gen3
   ];
 
-  # Laptop ESP mount point (511 MiB ESP — cap boot entries so it stays below full).
+  # 511 MiB ESP
   boot.loader.systemd-boot.configurationLimit = 5;
   boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
-  # Enable virtual camera and virtual microphone kernel modules.
+  # Virtual camera & mic
   boot.extraModulePackages = with config.boot.kernelPackages; [ v4l2loopback.out ];
 
   boot.kernelModules = [
-    # Virtual Camera
     "v4l2loopback"
-    # Virtual Microphone, built-in
     "snd-aloop"
   ];
 
   boot.extraModprobeConfig = ''
-    # exclusive_caps: Skype, Zoom, Teams etc. will only show device when actually streaming
-    # card_label: Name of virtual camera, how it'll show up in Skype, Zoom, Teams
     # https://github.com/umlaeute/v4l2loopback
     options v4l2loopback exclusive_caps=1 card_label="Virtual Camera"
   '';
 
   networking.hostName = "nixos";
 
-  # Allow timezone to be set dynamically by the desktop user.
-  time.timeZone = lib.mkForce null;
+  time.timeZone = lib.mkForce null; # let GNOME manage timezone
 
-  # Enable fingerprint reader.
   services.fprintd.enable = true;
 
-  # Use tlp over power-profiles-daemon.
+  # try tlp over ppd:
   services.power-profiles-daemon.enable = false;
   services.tlp = {
     enable = true;
@@ -61,16 +52,13 @@ in
       CPU_SCALING_GOVERNOR_ON_BAT = "performance";
     };
   };
-  # thermald for better performance: https://github.com/NixOS/nixpkgs/issues/211345#issuecomment-1387032707
+  # thermald for better performance? https://github.com/NixOS/nixpkgs/issues/211345#issuecomment-1387032707
   services.thermald.enable = true;
 
-  # Disable CUPS on laptop: https://news.ycombinator.com/item?id=41662596
+  # Actually, disable CUPS. I don't need it right now https://news.ycombinator.com/item?id=41662596
   services.printing.enable = false;
 
-  # Dedicated system user for the agent container's pigeons roost.
-  # Runs separately from the main pigeons service so it gets its own
-  # endpoint identity, delivering to the container's sshd on port 2222.
-  # Get the endpoint ID with: journalctl -u pigeons-agent -b | grep "id:"
+  # Dedicated user for the agent-box pigeons roost (port 2222)
   users.users.pigeons-agent = {
     isSystemUser = true;
     group = "pigeons-agent";
@@ -100,13 +88,10 @@ in
   # virtualisation.docker.enable = true; # couldn't enable after 25.11 update
 
   programs.steam = {
-    # Open ports in the firewall for Steam Remote Play
     remotePlay.openFirewall = true;
-    # Open ports in the firewall for Source Dedicated Server
     dedicatedServer.openFirewall = true;
   };
 
-  # Laptop-specific Home Manager settings (letta-code / nono-shell are desktop-only for now).
   home-manager.users.philipp.custom.discord-archive.spkiHash =
     "Qz1SMdBbcL2Mu17BB9q31qlkKyKKUeyIav3KIhtYZKE=";
 
@@ -118,7 +103,6 @@ in
     ];
   };
 
-  # Fonts.
   fonts.packages = with pkgs; [
     noto-fonts
     noto-fonts-cjk-sans
@@ -131,7 +115,6 @@ in
   # Possible ZSH workaround https://github.com/nix-community/home-manager/issues/2751#issuecomment-1048682643
   programs.zsh.enable = true;
 
-  # Extra libraries for nix-ld (fission cli, kubo, etc.).
   programs.nix-ld.libraries = with pkgs; [
     stdenv.cc.cc
     zlib
@@ -146,13 +129,9 @@ in
     zlib.out
   ];
 
-  # Verbose iroh logging on the laptop roost.
   systemd.services.pigeons.serviceConfig.Environment = "RUST_LOG=info,iroh=debug";
 
-  # Second pigeons roost for the agent container. Delivers incoming pigeons
-  # to the agent-box container's sshd on port 2222 (localhost only).
-  # Runs as a separate user so it gets a distinct endpoint identity from
-  # the main roost. Tail logs: journalctl -u pigeons-agent -f
+  # Separate roost for agent-box sshd on 127.0.0.1:2222 (endpoint ID in journalctl -u pigeons-agent)
   systemd.services.pigeons-agent = {
     description = "pigeons roost — agent container tunnel";
     after = [
@@ -177,10 +156,7 @@ in
     };
   };
 
-  # Declarative container for the sandboxed agent. Shares the host network
-  # (privateNetwork = false) so the pigeons-agent roost can reach it on
-  # 127.0.0.1:2222. The agent SSHes in as the `agent` user and gets a
-  # fully isolated filesystem — no access to the host's /home or /etc.
+  # Sandboxed agent container, reachable via pigeons-agent on 127.0.0.1:2222
   containers.agent-box = {
     autoStart = true;
     privateNetwork = false;
@@ -220,11 +196,5 @@ in
       };
   };
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "22.11"; # Did you read the comment?
+  system.stateVersion = "22.11";
 }

@@ -10,7 +10,7 @@
 let
   secureNode = import ../custom/nodejs-security.nix { pkgs = unstable; };
 
-  # Requests must use the NixOS CA exclusions, including when the GUI starts the daemon.
+  # Make Python requests use the system CA bundle
   withSystemCAs = package: package.overridePythonAttrs (old: {
     makeWrapperArgs = (old.makeWrapperArgs or [ ]) ++ [
       "--set" "REQUESTS_CA_BUNDLE" "/etc/ssl/certs/ca-certificates.crt"
@@ -50,9 +50,7 @@ in
     KACHE_CACHE_DIR = "${config.xdg.cacheHome}/kache";
   };
 
-  # Long-lived desktop sessions can skip newly added Home Manager variables when they inherit the
-  # session-variable sourcing guard. Cargo's own config applies the wrapper independently of that
-  # environment, including to builds launched by IDEs and sandboxed agents.
+  # Configure kache via Cargo so IDEs and sandboxed agents pick it up regardless of shell env
   home.file.".cargo/config.toml".text = ''
     [build]
     rustc-wrapper = "${kache}/bin/kache"
@@ -205,11 +203,8 @@ in
     pkgs.nftables
 
     # (pkgs.callPackage ../custom/opencode/package.nix { }) # seems to be broken on some download
-    # Disabled at 2.0.32 pending verified October 2026 CA/runtime fixes.
-    # Fixed OpenCode version: not yet established; verify its bundled runtime before re-enabling.
-    # unstable.opencode
+    # unstable.opencode # disabled pending CA/runtime fixes
     unstable.nono # sandbox for agents
-    # Re-enable alongside OpenCode.
     # (pkgs.callPackage ./oc-nono.nix { unstable = unstable; })
 
     (pkgs.writeShellApplication {

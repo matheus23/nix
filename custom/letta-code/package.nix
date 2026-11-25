@@ -20,9 +20,7 @@ let
     hash = "sha256-OLVW/kSyECnsJTd8MBrSffLv/jWuH/aQDfcAJlnsKJU=";
   };
 
-  # buildNpmPackage's offline-cache conversion cannot represent this release's
-  # dependency graph. Install from the pinned lock in a fixed-output derivation
-  # instead; its recursive hash keeps the result reproducible.
+  # FOD for node_modules (buildNpmPackage chokes on this release's dep graph)
   npmDeps = stdenv.mkDerivation {
     pname = "letta-code-npm-deps";
     inherit version src;
@@ -46,8 +44,6 @@ let
       cp -a node_modules "$out/"
     '';
 
-    # Fixed-output derivations must not acquire references when Nix fixes up
-    # scripts inside node_modules.
     dontPatchShebangs = true;
     dontFixup = true;
     outputHashMode = "recursive";
@@ -59,12 +55,9 @@ stdenv.mkDerivation {
   pname = "letta-code";
   inherit version src;
 
-  # Recover turns when a local provider rejects the per-request image COUNT
-  # (e.g. Gufo's HTTP 400 "at most 16 images") by eliding oldest images from
-  # the provider retry context. Remove when upstream supports count limits.
   patches = [
+    # Drop oldest images on retry when local providers (e.g. Gufo) reject >16 images
     ./local-image-count-recovery.patch
-    # Keep commit and PR messages free of automated Letta attribution.
     ./no-generated-attribution-03463.patch
   ];
 

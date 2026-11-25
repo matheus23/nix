@@ -6,12 +6,8 @@
 
 let
   system = pkgs.stdenv.hostPlatform.system;
-  # Pinned as an independent flake input in flake.nix so Gufo keeps the ROCm
-  # toolchain it qualifies for Strix Halo.
   gufoFlake = inputs.gufo;
-  # Agent clients re-send retained screenshots on every turn. Keep a 256 MiB
-  # decoded-image budget; maxRequestBytes below covers the base64 HTTP body.
-  # Remove the patch when upstream allows configuring this budget.
+  # Raise decoded-image budget to 256 MiB for agent screenshot turns
   gufo = gufoFlake.packages.${system}.default.overrideAttrs (
     _final: prev: { patches = (prev.patches or [ ]) ++ [ ./gufo-image-limit.patch ]; }
   );
@@ -31,14 +27,10 @@ let
     cacheDisk = "/var/lib/gufo/cache";
     cacheDiskBytes = 8589934592;
     cacheDiskStagingBytes = 8589934592;
-    # Base64 payloads for the patched 256 MiB decoded-image budget do not fit
-    # the default HTTP body limit.
-    maxRequestBytes = 512 * 1024 * 1024;
+    maxRequestBytes = 512 * 1024 * 1024; # base64 overhead for 256 MiB image budget
     extraArgs = [ "--log-progress" ];
   };
 
-  # llama-server no longer serves Qwen3.8-Flash-Next, so the fetcher for its
-  # GGUF shards lives here with the engine that actually loads them.
   downloadModels = pkgs.writeShellApplication {
     name = "download-qwen38-flash-next-model";
     runtimeInputs = with pkgs; [
@@ -49,13 +41,12 @@ let
   };
 in
 {
-  # The service is deliberately not enabled by default: llama-server uses the
-  # same GPU. Start gufo-server manually for comparison.
   environment.systemPackages = [
     gufo
     downloadModels
   ];
 
+  # Started manually; shares the GPU with llama-server
   systemd.services.gufo-server = {
     description = "Gufo Strix Halo inference server";
     after = [ "network.target" ];

@@ -17,9 +17,9 @@ This is a personal NixOS configuration repository, not an application codebase. 
 Both machines are managed via `nixosConfigurations` in `flake.nix`, matched by hostname (`philipps-desktop` for desktop, `nixos` for laptop):
 
 ```sh
-sudo -E nixos-rebuild switch --flake .                    # rebuild current machine (auto-detects host)
-sudo -E nixos-rebuild switch --flake .#philipps-desktop   # explicit desktop target
-sudo -E nixos-rebuild switch --flake .#nixos              # explicit laptop target
+nixos-rebuild switch --flake . --sudo                    # rebuild current machine (auto-detects host)
+nixos-rebuild switch --flake .#philipps-desktop --sudo   # explicit desktop target
+nixos-rebuild switch --flake .#nixos --sudo              # explicit laptop target
 ```
 
 Updating inputs:
@@ -31,7 +31,7 @@ nix flake update nixpkgs-unstable   # update a single input
 
 Notes:
 - **New files must be tracked by Git** (`git add` or `git add -N`) before Nix flake evaluation can see them.
-- **Private SSH inputs (`pigeons-src`, `mcp-zoo-src`)** are pinned to explicit `rev` values in `flake.nix` and locked in `flake.lock`. To bump one, update its `rev` in `flake.nix` and run `nix flake lock` as your user (so your ssh-agent is used). Passing `-E` to `sudo nixos-rebuild` (or using `nixos-rebuild switch --flake . --sudo`) forwards `SSH_AUTH_SOCK` if a fresh machine needs to fetch those inputs for the first time.
+- **Private SSH inputs (`pigeons-src`, `mcp-zoo-src`)** are pinned to explicit `rev` values in `flake.nix` and locked in `flake.lock`. To bump one, update its `rev` in `flake.nix` and run `nix flake lock`. Using `--sudo` runs evaluation/builds as your user (so your ssh-agent is used directly without `$HOME` warnings) and escalates only for activation.
 - After a rebuild, reboot if kernel or bootloader changed.
 
 ## Flake Inputs
@@ -91,25 +91,6 @@ The `n0des` shell auto-manages a local PostgreSQL instance:
 ## Custom lmstudio Package
 
 `custom/lmstudio/package.nix` overrides the nixpkgs version (used in `home-manager/home.nix`). To update: find the latest version from `curl -ILs -o /dev/null -w '%{url_effective}' "https://lmstudio.ai/download/latest/linux/x64"`, compute the hash with `nix-prefetch-url --type sha256 "<url>"`, then update `version` and `hash` in the package file. The URL pattern is `https://installers.lmstudio.ai/linux/x64/<version>/LM-Studio-<version>-x64.AppImage`.
-
-## Custom mnemosyne Package
-
-`custom/mnemosyne/package.nix` packages [AxDSan/mnemosyne](https://github.com/AxDSan/mnemosyne) (PyPI `mnemosyne-memory`) as a `buildPythonApplication`, exposing the `mnemosyne` CLI. It's installed via `home-manager/home.nix`. Feature scope is **core + MCP + embeddings**; the `llm` (ctransformers) and `openclaw` extras are intentionally omitted since those deps aren't in nixpkgs.
-
-To bump the version:
-1. Update `version` in the package file to the new release tag (without the `v` prefix).
-2. Recompute the source hash:
-   ```sh
-   nix-prefetch-url --unpack "https://github.com/AxDSan/mnemosyne/archive/refs/tags/v<version>.tar.gz"
-   nix hash convert --to sri --hash-algo sha256 <hash-from-above>
-   ```
-3. Update `hash` in the package file with the resulting `sha256-...` value.
-4. Check `pyproject.toml` for new/changed dependencies and adjust `dependencies` accordingly.
-
-Gotchas:
-- Importing `mnemosyne` eagerly runs `init_db()`, which tries to create a DB dir under `$HOME` (unwritable `/homeless-shelter` in the sandbox). The package works around this by setting `MNEMOSYNE_DATA_DIR` to a temp dir in `postFixup` (the `pythonImportsCheck` runs right after `fixupPhase`).
-- At first runtime use, `fastembed` downloads the `bge-small-en-v1.5` embedding model from HuggingFace into the data dir (default `~/.hermes/mnemosyne/data`, override with `MNEMOSYNE_DATA_DIR`). It is not bundled in the Nix package.
-- For MCP clients (Cursor, Claude Code, Codex, etc.), point them at `command: "mnemosyne", args: ["mcp"]`.
 
 ## Custom letta-code Package
 

@@ -1,4 +1,3 @@
-# Desktop-specific NixOS configuration. Shared settings live in ../common.nix.
 {
   pkgs,
   unstable,
@@ -10,24 +9,21 @@ let
 in
 {
   imports = [
-    # Include the results of the hardware scan.
     ./hardware-configuration.nix
     ./llama-server.nix
     ./gufo-server.nix
   ];
 
-  boot.kernelPackages = pkgs.linuxPackages_6_18; # needed to fix WiFi driver not advertising P2P-device
+  boot.kernelPackages = pkgs.linuxPackages_6_18; # fixes WiFi driver not advertising P2P-device
 
-  # Expand GPU-visible memory to 124 GiB for large ROCm models on Strix Halo.
+  # 124 GiB GPU-visible memory for Strix Halo
   boot.kernelParams = [
     "amdgpu.gttsize=126976"
     "ttm.pages_limit=32505856"
     "ttm.page_pool_size=32505856"
   ];
 
-  # Keep /nix/store outside snapper's root snapshots. NixOS applies the public
-  # read-only store bind from boot.nixStoreMountOpts; the daemon keeps its private
-  # writable view.
+  # Keep /nix/store out of snapper root snapshots
   fileSystems."/nix/store" = {
     device = "/dev/disk/by-uuid/18fb10b7-1f41-4b2d-8c2a-d86825840375";
     fsType = "btrfs";
@@ -38,17 +34,14 @@ in
 
   services.dbus.packages = [ pkgs.miraclecast ];
 
-  # Set your time zone.
   time.timeZone = "Europe/Berlin";
 
   services.displayManager.gdm.autoSuspend = false;
 
-  # Set shell history to append instead of replace.
   programs.bash.interactiveShellInit = ''
     shopt -s histappend
   '';
 
-  # Enable CUPS to print documents.
   services.printing.enable = true;
 
   virtualisation.podman.enable = true;
@@ -67,8 +60,7 @@ in
 
   systemd.tmpfiles.rules = [
     "d /var/lib/wbo 0750 1000 1000 -"
-    # Separate subvolumes keep downloaded weights out of home snapshots.
-    # Existing ordinary directories must be migrated manually first.
+    # Separate subvolumes keep model weights out of home snapshots
     "v /home/philipp/.local/share/models 0755 philipp users -"
     "v /home/philipp/.lmstudio/models 0755 philipp users -"
   ];
@@ -94,7 +86,6 @@ in
     ];
   };
 
-  # Desktop-specific Home Manager settings.
   home-manager.users.philipp = {
     imports = [
       ../home-manager/letta-code.nix
@@ -103,7 +94,6 @@ in
     custom.discord-archive.spkiHash = "iinWnh0zDru6ToeSSHL4daigcE77KK12KnYX3IWwrys=";
   };
 
-  # Install firefox.
   programs.firefox.enable = true;
   programs.firefox.package = unstable.firefox;
 
@@ -120,18 +110,16 @@ in
     enable32Bit = true; # needed for Steam (32-bit games)
   };
 
-  # Load i2c_dev kernel module for OpenRGB I2C/SMBus access.
+  # OpenRGB I2C/SMBus access
   boot.extraModprobeConfig = ''
     options i2c_dev major=89
   '';
   boot.kernelModules = [ "i2c_dev" ];
 
-  # I2C device permissions for OpenRGB.
   services.udev.extraRules = ''
     SUBSYSTEM=="i2c-dev", GROUP="i2c", MODE="0660"
   '';
 
-  # Snapper - btrfs snapshots for rollback.
   services.snapper.snapshotRootOnBoot = true;
   services.snapper.configs.root = {
     SUBVOLUME = "/";
@@ -143,8 +131,7 @@ in
     TIMELINE_LIMIT_WEEKLY = 3;
     TIMELINE_LIMIT_MONTHLY = 3;
     TIMELINE_LIMIT_YEARLY = 0;
-    # snapshotRootOnBoot creates cleanup=number snapshots, which the timeline
-    # cleanup never touches. Without these they accumulate forever.
+    # Boot snapshots use cleanup=number, which timeline cleanup ignores
     NUMBER_CLEANUP = true;
     NUMBER_LIMIT = 10;
     NUMBER_LIMIT_IMPORTANT = 5;
@@ -162,7 +149,6 @@ in
     TIMELINE_LIMIT_YEARLY = 0;
   };
 
-  # Report Btrfs space and allocation pressure without taking cleanup actions.
   systemd.services.btrfs-pressure-monitor = {
     description = "Check Btrfs disk and allocation pressure";
     after = [ "local-fs.target" ];
@@ -197,17 +183,10 @@ in
     };
   };
 
-  # Capture pressure immediately before the existing daily snapshot cleanup.
   systemd.services.snapper-cleanup = {
     wants = [ "btrfs-pressure-monitor.service" ];
     after = [ "btrfs-pressure-monitor.service" ];
   };
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "25.11"; # Did you read the comment?
+  system.stateVersion = "25.11";
 }

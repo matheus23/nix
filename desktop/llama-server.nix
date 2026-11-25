@@ -5,29 +5,18 @@
 }:
 
 let
-  # Patch-free llama.cpp release with `inkling2_loop` support; see
-  # llama-cpp-inkling.nix for the pin and the bump procedure.
   llamaCppInkling = pkgs.callPackage ./llama-cpp-inkling.nix { };
 
   modelDir = "/home/philipp/.local/share/models/huggingface/ggml-org/Inkling-2-Mini-GGUF/e8a2cecf0e78914f07cc27b9be711a9b2c7561d9";
   slotSavePath = "/home/philipp/.cache/ava/slots";
 
-  # Models exposed by the llama-server router. Comment out an entry to disable
-  # that model; --models-max and ConditionPathExists follow this list.
   models = [
     {
       name = "inkling-2-mini-iq4-nl";
       model = "${modelDir}/Inkling-2-Mini-IQ4_NL.gguf";
       mmproj = "${modelDir}/mmproj-Inkling-2-Mini-Q8_0.gguf";
-      # Inkling 2 Mini is a looped MoE (26B total / 5.4B active, layers 6-17
-      # revisited three times) trained NVFP4/MXFP8. IQ4_NL carries the same
-      # information as the trained NVFP4 experts at 17.6 GB. The sampling
-      # values below are the model card's own defaults; anything sharper
-      # degrades its reasoning.
-      #
-      # ctx-size is well below the 1M the architecture advertises: KV cache
-      # grows linearly and 128K already leaves room for gufo's Qwen weights to
-      # be swapped in on the same GPU. Raise it here if Inkling runs alone.
+      # Model card sampling defaults (sharper values degrade reasoning).
+      # 128K ctx leaves room for gufo's weights on the same GPU.
       settings = {
         ctx-size = 131072;
         parallel = 1;
@@ -73,10 +62,7 @@ let
 
   modelPaths = lib.concatMap (m: [ m.model ] ++ lib.optional (m ? mmproj) m.mmproj) models;
 
-  # Llama Chat, served straight off the store instead of letting the server
-  # pull it from the Hugging Face bucket at runtime. Kept separate from the
-  # binary so the build needs no npm: upstream removed tools/ui in b12651, so
-  # the UI can no longer be compiled from the same tarball.
+  # Prebuilt Llama Chat UI (upstream dropped tools/ui in b12651)
   llamaUi = pkgs.fetchzip {
     name = "llama-ui";
     url = "https://huggingface.co/buckets/ggml-org/llama-ui/resolve/latest/dist.tar.gz?download=true";
@@ -122,11 +108,8 @@ in
         "${llamaCppInkling}/bin/llama-server"
         "--host"
         "127.0.0.1"
-        # gufo-server holds 8422 for Qwen3.8-Flash-Next; the two never run at
-        # the same time (gufo-server declares Conflicts=), so this server gets
-        # its own port instead of stealing that one.
         "--port"
-        "8423"
+        "8423" # gufo-server uses 8422
         "--path"
         llamaUi
         "--models-preset"

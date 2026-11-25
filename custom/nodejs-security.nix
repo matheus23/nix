@@ -1,8 +1,7 @@
 { pkgs }:
 
 let
-  # Remove these overrides once the channel provides Node 22.23.4 and 24.22.1
-  # or newer, including the October 2026 dependency security updates.
+  # Drop once nixpkgs ships Node >= 22.23.4 and >= 24.22.1
   patched =
     base: version: hash:
     if pkgs.lib.versionAtLeast base.version version then
@@ -14,8 +13,7 @@ let
           url = "https://nodejs.org/dist/v${version}/node-v${version}.tar.xz";
           inherit hash;
         };
-      # Use the dependency versions and bundled CA default shipped with the security
-      # release. Bundled OpenSSL doesn't know NixOS's system trust-store path.
+        # Use bundled deps + CA roots from the security release
         configureFlags = builtins.filter (
           flag:
           flag != "--openssl-use-def-ca-store"
@@ -26,7 +24,6 @@ let
             "brotli"
           ]
         ) old.configureFlags;
-        # Bundled OpenSSL installs its own headers; don't link the system headers over them.
         postInstall =
           builtins.replaceStrings [ "${pkgs.lib.getDev pkgs.openssl}/include/*" ] [ "" ]
             old.postInstall;
